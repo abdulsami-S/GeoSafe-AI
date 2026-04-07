@@ -30,26 +30,21 @@ function displayResult(data) {
     else if (data.risk === "High") riskClass = "high";
 
     resultDiv.innerHTML = `
-        <h3>📊 Analysis Result</h3>
+    <h3>📊 Analysis Result</h3>
 
-        <p><span class="label">📍 Location:</span><br>
-        ${data.location.lat}, ${data.location.lon}</p>
+    <p><span class="label">📍 Location:</span> ${data.location.lat}, ${data.location.lon}</p>
 
-        <p><span class="label">📊 Risk Level:</span><br>
-        <span class="${riskClass}">${data.risk}</span></p>
+    <p><span class="label">📊 Risk Level:</span> 
+    <span class="${riskClass}">${data.risk}</span></p>
 
-        <p><span class="label">🌱 Land Info:</span><br>
-        ${data.explanation}</p>
+    <p><span class="label">🌱 Land Info:</span><br>
+    ${data.explanation}</p>
 
-        <p><span class="label">⚠️ Environmental Flags:</span><br>
-        ${envFlags}</p>
+    <p><span class="label">⚠️ Environmental Flags:</span> ${envFlags}</p>
 
-        <p><span class="label">🏛️ Legal Flags:</span><br>
-        ${legalFlags}</p>
-    `;
+    <p><span class="label">🏛️ Legal Flags:</span> ${legalFlags}</p>
+`;
 }
-
-
 
 // ==========================
 // MAIN FUNCTION
@@ -57,6 +52,7 @@ function displayResult(data) {
 async function checkLand() {
     const lat = document.getElementById("lat").value;
     const lon = document.getElementById("lon").value;
+
     document.getElementById("result").innerHTML = "⏳ Checking location...";
 
     if (!lat || !lon) {
@@ -89,7 +85,22 @@ async function checkLand() {
             map.removeLayer(marker);
         }
 
-        marker = L.marker([latitude, longitude]).addTo(map);
+        // ==========================
+        // COLOR BASED MARKER 🔥
+        // ==========================
+        let markerColor = "blue";
+
+        if (data.risk === "High") markerColor = "red";
+        else if (data.risk === "Medium") markerColor = "orange";
+        else markerColor = "green";
+
+        let icon = L.icon({
+            iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${markerColor}.png`,
+            iconSize: [25, 41],
+            iconAnchor: [12, 41]
+        });
+
+        marker = L.marker([latitude, longitude], { icon: icon }).addTo(map);
 
         marker.bindPopup(
             `<b>Risk:</b> ${data.risk}<br>
@@ -102,7 +113,10 @@ async function checkLand() {
     }
 }
 
-    async function loadLayers() {
+// ==========================
+// LOAD GIS LAYERS
+// ==========================
+async function loadLayers() {
 
     // 🔵 Ocean
     const oceanRes = await fetch("http://127.0.0.1:5000/layers/water");
@@ -141,4 +155,7 @@ async function checkLand() {
     }).addTo(map);
 }
 
+// ==========================
+// AUTO LOAD LAYERS
+// ==========================
 loadLayers();

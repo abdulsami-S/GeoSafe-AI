@@ -6,82 +6,119 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
   <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #1e3c72, #2a5298);
-      color: white;
-    }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    color: white;
+  }
 
-    /* HEADER */
-    .header {
-      text-align: center;
-      padding: 20px;
-      font-size: 24px;
-      font-weight: bold;
-    }
+  /* HEADER */
+  .header {
+    text-align: center;
+    padding: 20px;
+    font-size: 28px;
+    font-weight: bold;
+  }
 
-    /* INPUT BAR */
-    .input-bar {
-      text-align: center;
-      margin-bottom: 15px;
-    }
+  /* INPUT BAR */
+  .input-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
 
-    input {
-      padding: 10px;
-      margin: 5px;
-      border-radius: 8px;
-      border: none;
-      width: 150px;
-    }
+  input {
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    width: 180px;
+    font-size: 16px;
+  }
 
-    button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      background: #00c6ff;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
-    }
+  button {
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    background: #00c6ff;
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+  }
 
-    button:hover {
-      background: #0072ff;
-    }
+  button:hover {
+    background: #0072ff;
+  }
 
-    /* MAIN GRID */
+  /* MAIN GRID */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 25px;
+    padding: 20px;
+  }
+
+  /* CARD */
+  .card {
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  .card h3 {
+    font-size: 20px;
+    margin-bottom: 15px;
+  }
+
+  /* MAP */
+  #map {
+    height: 75vh;
+    border-radius: 15px;
+  }
+
+  /* RISK COLORS */
+  .low {
+    background: #28a745;
+    padding: 6px 12px;
+    border-radius: 8px;
+  }
+
+  .medium {
+    background: #ffc107;
+    color: black;
+    padding: 6px 12px;
+    border-radius: 8px;
+  }
+
+  .high {
+    background: #dc3545;
+    padding: 6px 12px;
+    border-radius: 8px;
+  }
+
+  .label {
+    font-weight: bold;
+  }
+
+  /* MOBILE FIX */
+  @media (max-width: 768px) {
     .main {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 20px;
-      padding: 20px;
+      grid-template-columns: 1fr;
     }
 
-    /* CARD */
-    .card {
-      background: rgba(255,255,255,0.15);
-      backdrop-filter: blur(10px);
-      border-radius: 15px;
-      padding: 20px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    }
-
-    /* MAP */
     #map {
-      height: 80vh;
-      border-radius: 15px;
+      height: 400px;
     }
-
-    /* RISK COLORS */
-    .low { background: #28a745; padding:5px 10px; border-radius:8px; }
-    .medium { background: #ffc107; color:black; padding:5px 10px; border-radius:8px; }
-    .high { background: #dc3545; padding:5px 10px; border-radius:8px; }
-
-    .label {
-      font-weight: bold;
-    }
-
-  </style>
+  }
+</style>
 </head>
 
 <body>
