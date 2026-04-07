@@ -63,10 +63,10 @@ Open `index.html` in browser
 ## 📸 Screenshots
 
 ### 🌍 Map View
-<img src="frontend/screenshots/map.png" width="100%">
+<img src="./frontend/screenshots/map.png" width="100%">
 
 ### 📊 Result Panel
-<img src="frontend/screenshots/result.png" width="100%">
+<img src="./frontend/screenshots/result.png" width="100%">
 
 ---
 
