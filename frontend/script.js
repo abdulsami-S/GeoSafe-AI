@@ -10,7 +10,7 @@ let marker;
 // ==========================
 // DISPLAY RESULT
 // ==========================
-function displayResult(data) {
+function displayResult(data, locationName) {
     let resultDiv = document.getElementById("result");
 
     let envFlags = data.environmental_flags.length > 0 
@@ -27,7 +27,8 @@ function displayResult(data) {
         <h3>📊 Analysis Result</h3>
 
         <p><span class="label">📍 Location:</span><br>
-        ${data.location.lat}, ${data.location.lon}</p>
+        ${locationName}
+        </p>
 
         <p><span class="label">📊 Risk Level:</span><br>
         <span class="${riskClass}">${data.risk}</span></p>
@@ -46,9 +47,27 @@ function displayResult(data) {
 // ==========================
 // MAIN FUNCTION
 // ==========================
+async function getLocationName(lat, lon) {
+    try {
+        const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+        );
+
+        const data = await res.json();
+
+        return data.display_name || "Unknown location";
+
+    } catch (error) {
+        console.error("Geocoding error:", error);
+        return "Location not found";
+    }
+}
+
+
 async function checkLand() {
     const lat = document.getElementById("lat").value;
     const lon = document.getElementById("lon").value;
+    const locationName = await getLocationName(lat, lon);
 
     if (!lat || !lon) {
         alert("Enter coordinates");
@@ -66,7 +85,7 @@ async function checkLand() {
 
         const data = await res.json();
 
-        displayResult(data);
+        displayResult(data, locationName);
 
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lon);
