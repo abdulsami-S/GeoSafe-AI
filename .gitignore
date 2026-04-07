@@ -1,0 +1,20 @@
+# Ignore dataset folder
+backend/data/
+
+# Ignore GIS shapefile components
+*.shp
+*.dbf
+*.shx
+*.prj
+*.cpg
+
+# Ignore zip files
+*.zip
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db

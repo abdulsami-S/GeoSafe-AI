@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GeoSafe AI</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <style>
+    body {
+      font-family: Arial;
+      text-align: center;
+    }
+    #map {
+      height: 500px;
+      margin-top: 20px;
+    }
+    input {
+      padding: 8px;
+      margin: 5px;
+    }
+    button {
+      padding: 8px 15px;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 15px;
+      font-weight: bold;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+<body>
+
+<h2>GeoSafe AI - Land Checker 🗺️</h2>
+
+<input id="lat" placeholder="Latitude (e.g. 13.0827)">
+<input id="lon" placeholder="Longitude (e.g. 80.2707)">
+<button onclick="checkLand()">Check</button>
+
+<pre id="result"></pre>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
