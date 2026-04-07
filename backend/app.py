@@ -90,10 +90,21 @@ def check_land():
     environmental_flags = []
     legal_flags = []
 
+    # =========================
+    # CORRECTED LOGIC
+    # =========================
+
     if in_ocean:
-        risk = "High"
-        environmental_flags.append("Ocean")
-        explanation = " This location is in the ocean. It is not usable land and may be restricted for any development or use."
+
+        if near_coast:
+            risk = "Medium"
+            environmental_flags.append("Coastal zone")
+            explanation = "This location is near coastline. It may be restricted without permission and can lead to legal issues or environmental risks."
+
+        else:
+            risk = "High"
+            environmental_flags.append("Ocean")
+            explanation = " This location is in the ocean. It is not usable land and may be restricted for any development or use."
 
     elif in_lake:
         risk = "High"
@@ -115,11 +126,6 @@ def check_land():
         environmental_flags.append("Near river")
         explanation = "This location is near a river. There may be risk due to water flow or flooding."
 
-    elif near_coast:
-        risk = "Medium"
-        environmental_flags.append("Coastal zone")
-        explanation = "This location is near coastline. It may be restricted without permission and can lead to legal issues or environmental risks."
-
     elif in_island:
         risk = "Medium"
         environmental_flags.append("Island")
@@ -133,7 +139,7 @@ def check_land():
         risk = "Medium"
         environmental_flags.append("Unknown terrain")
         explanation = "Unable to classify terrain"
-
+        
     # =========================
     # RESPONSE
     # =========================
