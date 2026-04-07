@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app)
 
 # =========================
-# LOAD GLOBAL DATA (Natural Earth)
+# LOAD GLOBAL DATA
 # =========================
 land = gpd.read_file("data/ne_10m_land.shp").to_crs(epsg=4326)
 ocean = gpd.read_file("data/ne_10m_ocean.shp").to_crs(epsg=4326)
@@ -20,11 +20,18 @@ coast = gpd.read_file("data/ne_10m_coastline.shp").to_crs(epsg=4326)
 islands = gpd.read_file("data/ne_10m_minor_islands.shp").to_crs(epsg=4326)
 
 # =========================
-# LOAD INDIA FOREST (OSM)
+# LOAD OSM FOREST
 # =========================
 landuse = gpd.read_file("data/gis_osm_landuse_a_free_1.shp")
-forest = landuse[landuse["fclass"] == "forest"]
-forest = forest.to_crs(epsg=4326)
+forest = landuse[landuse["fclass"] == "forest"].to_crs(epsg=4326)
+
+# =========================
+# LOAD GOVT LAND (OPTIONAL)
+# =========================
+try:
+    govt = gpd.read_file("data/govt_land.geojson").to_crs(epsg=4326)
+except:
+    govt = None
 
 # =========================
 # HOME
@@ -33,6 +40,21 @@ forest = forest.to_crs(epsg=4326)
 def home():
     return "GeoSafe AI Backend Running ✅"
 
+# =========================
+# SEND GEOJSON DATA
+# =========================
+@app.route("/layers/water")
+def get_water():
+    return ocean.to_json()
+
+@app.route("/layers/lakes")
+def get_lakes():
+    return lakes.to_json()
+
+@app.route("/layers/forest")
+def get_forest():
+    return forest.to_json()
+    
 # =========================
 # MAIN API
 # =========================
@@ -54,6 +76,10 @@ def check_land():
     on_land = land.contains(point).any()
     in_forest = forest.contains(point).any()
 
+    in_govt = False
+    if govt is not None:
+        in_govt = govt.contains(point).any()
+
     # Distance checks
     near_river = rivers.distance(point).min() < 0.05 if len(rivers) > 0 else False
     near_coast = coast.distance(point).min() < 0.05 if len(coast) > 0 else False
@@ -62,41 +88,46 @@ def check_land():
     # DECISION LOGIC
     # =========================
     environmental_flags = []
-    legal_flags = []  # kept for structure
+    legal_flags = []
 
     if in_ocean:
         risk = "High"
         environmental_flags.append("Ocean")
-        explanation = "Location is in ocean (not usable land)"
+        explanation = " This location is in the ocean. It is not usable land and may be restricted for any development or use."
 
     elif in_lake:
         risk = "High"
         environmental_flags.append("Lake")
-        explanation = "Location is inside lake"
+        explanation = "This location is inside lake. It is a water body and may not be allowed for use."
 
     elif in_forest:
         risk = "High"
         environmental_flags.append("Forest zone")
-        explanation = "Location is inside forest (eco-sensitive area)"
+        explanation = "This location is forest area(eco-sensitive area). It is protected for biodiversity and restricted for normal use."
+
+    elif in_govt:
+        risk = "High"
+        legal_flags.append("Government restricted land")
+        explanation = "This location is governmentland.Access or usage may require permissions or may be prohibited."
 
     elif near_river:
         risk = "Medium"
         environmental_flags.append("Near river")
-        explanation = "Location is near river (flood risk)"
+        explanation = "This location is near a river. There may be risk due to water flow or flooding."
 
     elif near_coast:
         risk = "Medium"
         environmental_flags.append("Coastal zone")
-        explanation = "Location is near coastline (erosion/flood risk)"
+        explanation = "This location is near coastline. It may be restricted without permission and can lead to legal issues or environmental risks."
 
     elif in_island:
         risk = "Medium"
         environmental_flags.append("Island")
-        explanation = "Location is on island"
+        explanation = "This location is on an island. Access and development may be limited or restricted and require permissions."
 
     elif on_land:
         risk = "Low"
-        explanation = "Safe land"
+        explanation = "This location is normal land and suitable for general use."
 
     else:
         risk = "Medium"

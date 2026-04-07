@@ -2,42 +2,111 @@
 <html>
 <head>
   <title>GeoSafe AI</title>
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
   <style>
     body {
-      font-family: Arial;
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1e3c72, #2a5298);
+      color: white;
+    }
+
+    /* HEADER */
+    .header {
       text-align: center;
+      padding: 20px;
+      font-size: 24px;
+      font-weight: bold;
     }
-    #map {
-      height: 500px;
-      margin-top: 20px;
+
+    /* INPUT BAR */
+    .input-bar {
+      text-align: center;
+      margin-bottom: 15px;
     }
+
     input {
-      padding: 8px;
+      padding: 10px;
       margin: 5px;
+      border-radius: 8px;
+      border: none;
+      width: 150px;
     }
+
     button {
-      padding: 8px 15px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #00c6ff;
+      color: white;
+      font-weight: bold;
       cursor: pointer;
     }
-    #result {
-      margin-top: 15px;
-      font-weight: bold;
-      white-space: pre-line;
+
+    button:hover {
+      background: #0072ff;
     }
+
+    /* MAIN GRID */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 20px;
+      padding: 20px;
+    }
+
+    /* CARD */
+    .card {
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    }
+
+    /* MAP */
+    #map {
+      height: 80vh;
+      border-radius: 15px;
+    }
+
+    /* RISK COLORS */
+    .low { background: #28a745; padding:5px 10px; border-radius:8px; }
+    .medium { background: #ffc107; color:black; padding:5px 10px; border-radius:8px; }
+    .high { background: #dc3545; padding:5px 10px; border-radius:8px; }
+
+    .label {
+      font-weight: bold;
+    }
+
   </style>
 </head>
+
 <body>
 
-<h2>GeoSafe AI - Land Checker 🗺️</h2>
+<div class="header">
+  🌍 GeoSafe AI - Smart Land Analyzer
+</div>
 
-<input id="lat" placeholder="Latitude (e.g. 13.0827)">
-<input id="lon" placeholder="Longitude (e.g. 80.2707)">
-<button onclick="checkLand()">Check</button>
+<div class="input-bar">
+  <input id="lat" placeholder="Latitude">
+  <input id="lon" placeholder="Longitude">
+  <button onclick="checkLand()">Check</button>
+</div>
 
-<pre id="result"></pre>
+<div class="main">
 
-<div id="map"></div>
+  <!-- RESULT -->
+  <div id="result" class="card">
+    <p>Enter coordinates to analyze land...</p>
+  </div>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+</div>
 
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="script.js"></script>
