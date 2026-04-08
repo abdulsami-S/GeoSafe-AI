@@ -136,6 +136,7 @@ Open `frontend/index.html` in browser
 ## 👨‍💻 Author
 
 Abdul Sami
+
 Thrivikram
 
 ---
