@@ -15,6 +15,25 @@ landuse = gpd.read_file("../data/gis_osm_landuse_a_free_1.shp")
 forest = landuse[landuse["fclass"] == "forest"].to_crs(epsg=3857)
 
 # =========================
+# CREATE SPATIAL INDEX (SPEED BOOST)
+# =========================
+rivers_sindex = rivers.sindex
+lakes_sindex = lakes.sindex
+ocean_sindex = ocean.sindex
+forest_sindex = forest.sindex
+
+# =========================
+# FAST DISTANCE FUNCTION
+# =========================
+def fast_distance(gdf, sindex, point):
+    try:
+        idx = list(sindex.nearest(point.bounds, 1))
+        nearest_geom = gdf.iloc[idx]
+        return nearest_geom.distance(point).min() / 1000  # km
+    except:
+        return 999  # fallback
+
+# =========================
 # LOAD ELEVATION
 # =========================
 elevation_data = rasterio.open("data/elevation.tif")
@@ -31,7 +50,7 @@ def get_elevation(lat, lon):
 # =========================
 data = []
 
-for i in range(3000):   # BIG DATASET
+for i in range(4000):   # large dataset
 
     lat = random.uniform(10, 20)
     lon = random.uniform(70, 80)
@@ -39,11 +58,13 @@ for i in range(3000):   # BIG DATASET
     point = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326").to_crs(epsg=3857)
     point = point.iloc[0]
 
-    # Distances (km)
-    dist_river = rivers.distance(point).min() / 1000
-    dist_lake = lakes.distance(point).min() / 1000
-    dist_ocean = ocean.distance(point).min() / 1000
-    dist_forest = forest.distance(point).min() / 1000
+    # =========================
+    # FAST DISTANCE CALCULATION
+    # =========================
+    dist_river = fast_distance(rivers, rivers_sindex, point)
+    dist_lake = fast_distance(lakes, lakes_sindex, point)
+    dist_ocean = fast_distance(ocean, ocean_sindex, point)
+    dist_forest = fast_distance(forest, forest_sindex, point)
 
     elevation = get_elevation(lat, lon)
 
@@ -51,32 +72,42 @@ for i in range(3000):   # BIG DATASET
     slope = abs(elevation - random.uniform(0, 500))
 
     # =========================
-    # REALISTIC RISK LOGIC
+    # IMPROVED RISK LABELING
     # =========================
-    if elevation < 50 and dist_river < 1:
-        risk = 2   # High
-    elif elevation < 100 or dist_river < 2:
-        risk = 1   # Medium
-    else:
-        risk = 0   # Low
+    if dist_ocean < 0.5 or dist_lake < 0.3:
+        risk = 2   # HIGH
 
-    # Add noise (IMPORTANT)
-    if random.random() < 0.15:
+    elif dist_river < 1 or elevation < 50:
+        risk = 1   # MEDIUM
+
+    else:
+        risk = 0   # LOW
+
+    # =========================
+    # ADD NOISE (REAL ML BEHAVIOR)
+    # =========================
+    if random.random() < 0.10:
         risk = random.choice([0, 1, 2])
 
     data.append([
-        lat, lon, dist_river, dist_lake,
-        dist_ocean, dist_forest, elevation, slope, risk
+        lat, lon,
+        dist_river, dist_lake,
+        dist_ocean, dist_forest,
+        elevation, slope,
+        risk
     ])
 
 # =========================
 # SAVE DATA
 # =========================
 df = pd.DataFrame(data, columns=[
-    "lat", "lon", "dist_river", "dist_lake",
-    "dist_ocean", "dist_forest", "elevation", "slope", "risk"
+    "lat", "lon",
+    "dist_river", "dist_lake",
+    "dist_ocean", "dist_forest",
+    "elevation", "slope",
+    "risk"
 ])
 
 df.to_csv("big_data.csv", index=False)
 
-print("Dataset created successfully!")
+print("Dataset created successfully! ")
