@@ -2,6 +2,9 @@ import geopandas as gpd
 from shapely.geometry import Point
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import joblib
+import numpy as np
+import rasterio
 
 # =========================
 # INIT
@@ -10,51 +13,42 @@ app = Flask(__name__)
 CORS(app)
 
 # =========================
-# LOAD GLOBAL DATA
+# LOAD ML MODEL
 # =========================
-land = gpd.read_file("data/ne_10m_land.shp").to_crs(epsg=4326)
-ocean = gpd.read_file("data/ne_10m_ocean.shp").to_crs(epsg=4326)
-lakes = gpd.read_file("data/ne_10m_lakes.shp").to_crs(epsg=4326)
-rivers = gpd.read_file("data/ne_10m_rivers_lake_centerlines.shp").to_crs(epsg=4326)
-coast = gpd.read_file("data/ne_10m_coastline.shp").to_crs(epsg=4326)
-islands = gpd.read_file("data/ne_10m_minor_islands.shp").to_crs(epsg=4326)
+model = joblib.load("ML/model.pkl")
 
 # =========================
-# LOAD OSM FOREST
+# LOAD GIS DATA (FIXED CRS)
 # =========================
+land = gpd.read_file("data/ne_10m_land.shp").to_crs(epsg=3857)
+ocean = gpd.read_file("data/ne_10m_ocean.shp").to_crs(epsg=3857)
+lakes = gpd.read_file("data/ne_10m_lakes.shp").to_crs(epsg=3857)
+rivers = gpd.read_file("data/ne_10m_rivers_lake_centerlines.shp").to_crs(epsg=3857)
+coast = gpd.read_file("data/ne_10m_coastline.shp").to_crs(epsg=3857)
+
+# Forest
 landuse = gpd.read_file("data/gis_osm_landuse_a_free_1.shp")
-forest = landuse[landuse["fclass"] == "forest"].to_crs(epsg=4326)
+forest = landuse[landuse["fclass"] == "forest"].to_crs(epsg=3857)
 
 # =========================
-# LOAD GOVT LAND (OPTIONAL)
+# LOAD ELEVATION
 # =========================
-try:
-    govt = gpd.read_file("data/govt_land.geojson").to_crs(epsg=4326)
-except:
-    govt = None
+elevation_data = rasterio.open("ML/data/elevation.tif")
+
+def get_elevation(lat, lon):
+    try:
+        val = list(elevation_data.sample([(lon, lat)]))[0][0]
+        return float(val)
+    except:
+        return 0
 
 # =========================
 # HOME
 # =========================
 @app.route("/")
 def home():
-    return "GeoSafe AI Backend Running ✅"
+    return "GeoSafe AI ML Backend Running 🚀"
 
-# =========================
-# SEND GEOJSON DATA
-# =========================
-@app.route("/layers/water")
-def get_water():
-    return ocean.to_json()
-
-@app.route("/layers/lakes")
-def get_lakes():
-    return lakes.to_json()
-
-@app.route("/layers/forest")
-def get_forest():
-    return forest.to_json()
-    
 # =========================
 # MAIN API
 # =========================
@@ -65,81 +59,84 @@ def check_land():
     lat = float(data["lat"])
     lon = float(data["lon"])
 
-    point = Point(lon, lat)
+    # Convert to metric CRS
+    point = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326").to_crs(epsg=3857)
+    point = point.iloc[0]
 
     # =========================
-    # SPATIAL CHECKS
+    # GIS FEATURES (REAL DISTANCE IN KM)
     # =========================
+    dist_ocean = ocean.distance(point).min() / 1000
+    dist_river = rivers.distance(point).min() / 1000
+    dist_forest = forest.distance(point).min() / 1000
+    dist_lake = lakes.distance(point).min() / 1000
+    dist_coast = coast.distance(point).min() / 1000
+
     in_ocean = ocean.contains(point).any()
     in_lake = lakes.contains(point).any()
-    in_island = islands.contains(point).any()
-    on_land = land.contains(point).any()
     in_forest = forest.contains(point).any()
-
-    in_govt = False
-    if govt is not None:
-        in_govt = govt.contains(point).any()
-
-    # Distance checks
-    near_river = rivers.distance(point).min() < 0.05 if len(rivers) > 0 else False
-    near_coast = coast.distance(point).min() < 0.05 if len(coast) > 0 else False
+    on_land = land.contains(point).any()
 
     # =========================
-    # DECISION LOGIC
+    # ML FEATURES (MATCH TRAINING)
+    # =========================
+    elevation = get_elevation(lat, lon)
+    slope = abs(elevation - 200)
+
+    features = np.array([[
+        dist_river,
+        dist_lake,
+        dist_ocean,
+        dist_forest,
+        elevation,
+        slope
+    ]])
+
+    # =========================
+    # ML PREDICTION
+    # =========================
+    pred = model.predict(features)[0]
+
+    if pred == 2:
+        risk = "High"
+    elif pred == 1:
+        risk = "Medium"
+    else:
+        risk = "Low"
+
+    # =========================
+    # EXPLANATION (UNCHANGED)
     # =========================
     environmental_flags = []
     legal_flags = []
 
-    # =========================
-    # CORRECTED LOGIC
-    # =========================
-
     if in_ocean:
-
-        if near_coast:
-            risk = "Medium"
-            environmental_flags.append("Coastal zone")
-            explanation = "This location is near coastline. It may be restricted without permission and can lead to legal issues or environmental risks."
-
-        else:
-            risk = "High"
-            environmental_flags.append("Ocean")
-            explanation = " This location is in the ocean. It is not usable land and may be restricted for any development or use."
+        environmental_flags.append("Ocean")
+        explanation = "This location is in the ocean. It is not usable land and may be restricted for any development or use."
 
     elif in_lake:
-        risk = "High"
         environmental_flags.append("Lake")
         explanation = "This location is inside lake. It is a water body and may not be allowed for use."
 
     elif in_forest:
-        risk = "High"
         environmental_flags.append("Forest zone")
-        explanation = "This location is forest area(eco-sensitive area). It is protected for biodiversity and restricted for normal use."
+        explanation = "This location is forest area (eco-sensitive area). It is protected for biodiversity and restricted for normal use."
 
-    elif in_govt:
-        risk = "High"
-        legal_flags.append("Government restricted land")
-        explanation = "This location is governmentland.Access or usage may require permissions or may be prohibited."
+    elif dist_coast < 2:
+        environmental_flags.append("Coastal zone")
+        explanation = "This location is near coastline. It may be restricted without permission and can lead to legal issues or environmental risks."
 
-    elif near_river:
-        risk = "Medium"
+    elif dist_river < 1:
         environmental_flags.append("Near river")
         explanation = "This location is near a river. There may be risk due to water flow or flooding."
 
-    elif in_island:
-        risk = "Medium"
-        environmental_flags.append("Island")
-        explanation = "This location is on an island. Access and development may be limited or restricted and require permissions."
-
     elif on_land:
-        risk = "Low"
         explanation = "This location is normal land and suitable for general use."
 
     else:
-        risk = "Medium"
         environmental_flags.append("Unknown terrain")
         explanation = "Unable to classify terrain"
-        
+
     # =========================
     # RESPONSE
     # =========================
@@ -148,7 +145,14 @@ def check_land():
         "risk": risk,
         "environmental_flags": environmental_flags,
         "legal_flags": legal_flags,
-        "explanation": explanation
+        "explanation": explanation,
+        "features": {
+            "distance_to_river_km": round(dist_river, 2),
+            "distance_to_lake_km": round(dist_lake, 2),
+            "distance_to_ocean_km": round(dist_ocean, 2),
+            "distance_to_forest_km": round(dist_forest, 2),
+            "elevation": round(elevation, 2)
+        }
     })
 
 # =========================
