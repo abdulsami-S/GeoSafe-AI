@@ -255,7 +255,7 @@ def check():
     if on_road:
         explanation += " Location lies on a road → not suitable."
     elif near_road:
-        explanation += f" Good road access ({road_count} nearby roads)."
+        explanation += " Good road access."
     else:
         explanation += " Poor road accessibility."
 

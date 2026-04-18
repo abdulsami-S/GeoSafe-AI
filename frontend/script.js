@@ -82,10 +82,7 @@ function displayResult(data, locationName) {
             <div class="value">${data.building_density}</div>
         </div>
 
-        <div class="section">
-            <div class="section-title">🛣 Roads Nearby</div>
-            <div class="value">${data.nearby_roads_count}</div>
-        </div>
+
 
         <div class="section">
             <div class="section-title">🏛 Land Status</div>
@@ -143,18 +140,13 @@ async function checkLand() {
         if (circle) map.removeLayer(circle);
 
         // ==========================
-        // COLOR LOGIC
+        // COLOR LOGIC (Based strongly on Risk Level)
         // ==========================
         let color = "green";
 
         if (data.risk === "High") color = "red";
         else if (data.risk === "Medium") color = "orange";
 
-        if (data.gov_land) color = "blue";
-
-        if (data.gov_type && data.gov_type.toLowerCase().includes("road")) {
-            color = "black";
-        }
 
         // ==========================
         // CIRCLE
