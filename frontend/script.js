@@ -1,86 +1,133 @@
-let waterLayer, forestLayer, lakeLayer;
+// ==========================
+// INIT MAP
+// ==========================
 var map = L.map('map').setView([13.0827, 80.2707], 10);
 
+// Fix white background
+map.getContainer().style.background = "#ddd";
+
+// ✅ STANDARD OPENSTREETMAP TILE LAYER
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
 
 let marker;
+let circle;
 
 // ==========================
-// DISPLAY RESULT
+// CLICK TO SELECT LOCATION
 // ==========================
-function displayResult(data, locationName) {
-    let resultDiv = document.getElementById("result");
-
-    let envFlags = data.environmental_flags.length > 0 
-        ? data.environmental_flags.join(", ") 
-        : "None";
-
-    let legalFlags = data.legal_flags.length > 0 
-        ? data.legal_flags.join(", ") 
-        : "None";
-
-    let riskClass = data.risk.toLowerCase();
-
-    resultDiv.innerHTML = `
-        <h3>📊 Analysis Result</h3>
-
-        <p><span class="label">📍 Location:</span><br>
-        ${locationName}
-        </p>
-
-        <p><span class="label">📊 Risk Level:</span><br>
-        <span class="${riskClass}">${data.risk}</span></p>
-
-        <p><span class="label">🌱 Land Info:</span><br>
-        ${data.explanation}</p>
-
-        <p><span class="label">⚠️ Environmental Flags:</span><br>
-        ${envFlags}</p>
-
-        <p><span class="label">🏛️ Legal Flags:</span><br>
-        ${legalFlags}</p>
-    `;
-}
+map.on('click', function (e) {
+    document.getElementById("lat").value = e.latlng.lat.toFixed(6);
+    document.getElementById("lon").value = e.latlng.lng.toFixed(6);
+});
 
 // ==========================
-// MAIN FUNCTION
+// GET LOCATION NAME
 // ==========================
 async function getLocationName(lat, lon) {
     try {
         const res = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
         );
-
         const data = await res.json();
-
         return data.display_name || "Unknown location";
-
-    } catch (error) {
-        console.error("Geocoding error:", error);
+    } catch {
         return "Location not found";
     }
 }
 
+// ==========================
+// DISPLAY RESULT
+// ==========================
+function displayResult(data, locationName) {
 
+    let riskColor = data.risk.toLowerCase();
+
+    let govStatus = data.gov_land
+        ? "⚠️ Restricted / Government Land"
+        : "✅ Safe / Private Land";
+
+    document.getElementById("result").innerHTML = `
+        <h2 style="margin-bottom:20px;">📊 Land Analysis</h2>
+
+        <div class="section">
+            <div class="section-title">📍 Location</div>
+            <div class="value">${locationName}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🎯 Purpose</div>
+            <div class="value">${data.purpose}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">📊 Risk Level</div>
+            <div class="${riskColor}">${data.risk}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🌍 Land Type</div>
+            <div class="value">${data.land_type}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🏔 Terrain</div>
+            <div class="value">${data.terrain} (${data.elevation} m)</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🏢 Buildings</div>
+            <div class="value">${data.building_density}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🛣 Roads Nearby</div>
+            <div class="value">${data.nearby_roads_count}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🏛 Land Status</div>
+            <div class="value">${govStatus}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">📌 Authority</div>
+            <div class="value">${data.gov_type}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🧠 AI Insight</div>
+            <div class="value">${data.explanation}</div>
+        </div>
+    `;
+}
+
+// ==========================
+// MAIN FUNCTION
+// ==========================
 async function checkLand() {
+
     const lat = document.getElementById("lat").value;
     const lon = document.getElementById("lon").value;
+    const purpose = document.getElementById("purpose").value;
+
+    if (!lat || !lon) return alert("Enter coordinates");
+    if (!purpose) return alert("Select purpose");
+
+    document.getElementById("result").innerHTML = `
+        <h2>⏳ Analyzing Location...</h2>
+        <p>AI is processing geographic data...</p>
+    `;
+
     const locationName = await getLocationName(lat, lon);
-
-    if (!lat || !lon) {
-        alert("Enter coordinates");
-        return;
-    }
-
-    document.getElementById("result").innerHTML = "⏳ Checking...";
 
     try {
         const res = await fetch("http://127.0.0.1:5000/check", {
             method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({lat, lon})
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat, lon, purpose })
         });
 
         const data = await res.json();
@@ -90,73 +137,54 @@ async function checkLand() {
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lon);
 
-        map.setView([latitude, longitude], 13);
+        map.flyTo([latitude, longitude], 14, { duration: 1.5 });
 
         if (marker) map.removeLayer(marker);
+        if (circle) map.removeLayer(circle);
 
-        // 🔥 Dynamic marker color
+        // ==========================
+        // COLOR LOGIC
+        // ==========================
         let color = "green";
+
         if (data.risk === "High") color = "red";
         else if (data.risk === "Medium") color = "orange";
 
+        if (data.gov_land) color = "blue";
+
+        if (data.gov_type && data.gov_type.toLowerCase().includes("road")) {
+            color = "black";
+        }
+
+        // ==========================
+        // CIRCLE
+        // ==========================
+        circle = L.circle([latitude, longitude], {
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.25,
+            radius: 300
+        }).addTo(map);
+
+        // ==========================
+        // MARKER
+        // ==========================
         let icon = L.icon({
             iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-${color}.png`,
             iconSize: [25, 41],
             iconAnchor: [12, 41]
         });
 
-        marker = L.marker([latitude, longitude], { icon }).addTo(map);
+        marker = L.marker([latitude, longitude], { icon }).addTo(map)
+            .bindPopup(`<b>${data.risk}</b><br>${data.explanation}`)
+            .openPopup();
 
-        marker.bindPopup(
-            `<b>${data.risk}</b><br>${data.explanation}`
-        ).openPopup();
+        marker.bindTooltip("Selected Location", {
+            direction: "top"
+        });
 
     } catch (err) {
         alert("Server error");
         console.error(err);
     }
 }
-
-// ==========================
-// LOAD GIS LAYERS
-// ==========================
-async function loadLayers() {
-
-    // 🌊 Ocean (CUSTOM COLOR)
-    const ocean = await fetch("http://127.0.0.1:5000/layers/water").then(r => r.json());
-
-    waterLayer = L.geoJSON(ocean, {
-        style: {
-            color: "#7cc0cf",   // ✅ YOUR COLOR
-            fillColor: "#7cc0cf",
-            weight: 1,
-            fillOpacity: 0.5
-        }
-    }).addTo(map);
-
-    // 🟦 Lakes
-    const lakes = await fetch("http://127.0.0.1:5000/layers/lakes").then(r => r.json());
-
-    lakeLayer = L.geoJSON(lakes, {
-        style: {
-            color: "#4da6ff",
-            fillColor: "#4da6ff",
-            weight: 1,
-            fillOpacity: 0.6
-        }
-    }).addTo(map);
-
-    // 🌳 Forest
-    const forest = await fetch("http://127.0.0.1:5000/layers/forest").then(r => r.json());
-
-    forestLayer = L.geoJSON(forest, {
-        style: {
-            color: "green",
-            fillColor: "green",
-            weight: 1,
-            fillOpacity: 0.4
-        }
-    }).addTo(map);
-}
-
-loadLayers();

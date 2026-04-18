@@ -11,7 +11,7 @@ import joblib
 data = pd.read_csv("big_data.csv")
 
 # =========================
-# FEATURES & LABEL
+# FEATURES
 # =========================
 X = data[[
     "dist_river",
@@ -19,31 +19,32 @@ X = data[[
     "dist_ocean",
     "dist_forest",
     "elevation",
-    "slope"
+    "terrain"
 ]]
 
 y = data["risk"]
 
 # =========================
-# CHECK DATA BALANCE
+# CHECK BALANCE
 # =========================
 print("Class Distribution:", Counter(y))
 
 # =========================
-# TRAIN / TEST SPLIT
+# SPLIT
 # =========================
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
+    X, y, test_size=0.2, random_state=42, stratify=y
 )
 
 # =========================
-# MODEL (OPTIMIZED)
+# MODEL (STRONG)
 # =========================
 model = RandomForestClassifier(
-    n_estimators=100,        # number of trees
-    max_depth=10,            # prevents overfitting
+    n_estimators=200,
+    max_depth=12,
+    min_samples_split=5,
     random_state=42,
-    n_jobs=-1                # use all CPU cores 
+    n_jobs=-1
 )
 
 # =========================
@@ -55,13 +56,13 @@ model.fit(X_train, y_train)
 # TEST
 # =========================
 y_pred = model.predict(X_test)
-
 accuracy = accuracy_score(y_test, y_pred)
-print(f"Model Accuracy: {accuracy:.4f}")
+
+print(f"✅ Model Accuracy: {accuracy:.4f}")
 
 # =========================
-# SAVE MODEL
+# SAVE
 # =========================
 joblib.dump(model, "model.pkl")
 
-print("Model saved successfully! ")
+print("✅ Model saved successfully!")
