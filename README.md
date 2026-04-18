@@ -138,6 +138,12 @@ Open `frontend/index.html` in browser
 Abdul Sami
 Thrivikram
 
+Thrivikram
+
+Leela Yashwanth
+
+Mohammad Samiullah 
+
 ---
 
 ## ⭐ Star this repo if you like it!
