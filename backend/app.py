@@ -74,7 +74,7 @@ def fast_distance(gdf, sindex, point):
 # =========================
 def get_buildings(lat, lon):
     try:
-        buffer = 0.01
+        buffer = 0.003 # ~300 meters, strictly matching the visual circle
         bbox = (lon-buffer, lat-buffer, lon+buffer, lat+buffer)
 
         buildings = gpd.read_file(
@@ -157,6 +157,37 @@ def terrain_type(e):
     elif e > 300:
         return "Hill"
     return "Plain"
+
+# =========================
+# NEIGHBORHOOD 5KM ANALYSIS
+# =========================
+def analyze_surroundings(lat, lon, radius_km=5):
+    try:
+        pt_4326 = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326")
+        pt_3857 = pt_4326.to_crs(epsg=3857).iloc[0]
+        
+        buffer_3857 = pt_3857.buffer(radius_km * 1000)
+        buffer_4326 = gpd.GeoSeries([buffer_3857], crs="EPSG:3857").to_crs(epsg=4326).iloc[0]
+        total_area = buffer_3857.area 
+        
+        def get_area_pct(gdf, sindex):
+            idx = list(sindex.intersection(buffer_4326.bounds))
+            if not idx: return 0
+            candidates = gdf.iloc[idx]
+            intersected = candidates.intersection(buffer_4326)
+            intersected = intersected[~intersected.is_empty]
+            if len(intersected) == 0: return 0
+            intersected_3857 = gpd.GeoSeries(intersected, crs="EPSG:4326").to_crs(epsg=3857)
+            return (intersected_3857.area.sum() / total_area) * 100
+            
+        res_pct = round(get_area_pct(residential, residential_sindex), 1)
+        ind_pct = round(get_area_pct(industrial, industrial_sindex), 1)
+        farm_pct = round(get_area_pct(farmland, farmland_sindex), 1)
+        
+        return res_pct, ind_pct, farm_pct
+    except Exception as e:
+        print("Analysis Error:", e)
+        return 0, 0, 0
 
 # =========================
 # API
@@ -249,18 +280,36 @@ def check():
     if gov_land and purpose.lower() == "residential":
         risk = "High"
 
-    # Explanation
-    explanation = f"{land_type} land with {terrain} terrain."
+    # Neighborhood Context Calculation
+    res_pct, ind_pct, farm_pct = analyze_surroundings(lat, lon, 5)
 
+    surroundings_map = {"Residential": res_pct, "Industrial": ind_pct, "Farming": farm_pct}
+    dominant_surround = max(surroundings_map, key=surroundings_map.get)
+    max_pct = surroundings_map[dominant_surround]
+    
+    if max_pct == 0:
+        dominant_surround = "Undeveloped / Open"
+        
+    ownership_status = "Government/Restricted Land" if gov_land else "Private Record"
     if on_road:
-        explanation += " Location lies on a road → not suitable."
-    elif near_road:
-        explanation += " Good road access."
-    else:
-        explanation += " Poor road accessibility."
+        ownership_status = "Public Road Infrastructure"
 
-    if gov_land:
-        explanation += f" Classified as {gov_type}."
+    # Dynamic Explanation
+    explanation = f"Ownership: {ownership_status}. "
+
+    if purpose.lower() == "general":
+        explanation += f"Based on surroundings, this land is best suited for {dominant_surround} development. "
+    else:
+        target_pct = surroundings_map.get(purpose.title(), 0)
+        if target_pct > 5 or land_type == purpose.title():
+            explanation += f"Suitable for {purpose} usage. Surrounding area implies compatibility. "
+        else:
+            explanation += f"May not be ideal for {purpose} based on surroundings. The dominant surrounding sector is {dominant_surround}. "
+    
+    if on_road:
+        explanation += "Warning: Exact location clashes directly with public road infrastructure. "
+    elif gov_land:
+        explanation += f"Warning: Exact location is restricted ({gov_type})."
 
     # Response
     return jsonify({
@@ -270,6 +319,10 @@ def check():
         "terrain": terrain,
         "elevation": round(elevation, 2),
         "building_density": building_density,
+        "res_pct": res_pct,
+        "ind_pct": ind_pct,
+        "farm_pct": farm_pct,
+        "ownership": ownership_status,
         "on_road": on_road,
         "near_road": near_road,
         "nearby_roads_count": road_count,

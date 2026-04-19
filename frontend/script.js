@@ -77,12 +77,12 @@ function displayResult(data, locationName) {
             <div class="value">${data.terrain} (${data.elevation} m)</div>
         </div>
 
+        ${data.purpose.toLowerCase() === "residential" ? `
         <div class="section">
-            <div class="section-title">🏢 Buildings</div>
+            <div class="section-title">🏢 Buildings in Radius</div>
             <div class="value">${data.building_density}</div>
         </div>
-
-
+        ` : ""}
 
         <div class="section">
             <div class="section-title">🏛 Land Status</div>
@@ -92,6 +92,15 @@ function displayResult(data, locationName) {
         <div class="section">
             <div class="section-title">📌 Authority</div>
             <div class="value">${data.gov_type}</div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">🌐 5km Surrounding Context</div>
+            <div class="value" style="font-weight: 500; font-size: 14px; opacity: 0.95;">
+               🌾 Farming: ${data.farm_pct}% <br>
+               🏠 Residential: ${data.res_pct}% <br>
+               🏭 Industrial: ${data.ind_pct}%
+            </div>
         </div>
 
         <div class="section">
@@ -134,7 +143,7 @@ async function checkLand() {
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lon);
 
-        map.flyTo([latitude, longitude], 14, { duration: 1.5 });
+        map.flyTo([latitude, longitude], 12, { duration: 1.5 });
 
         if (marker) map.removeLayer(marker);
         if (circle) map.removeLayer(circle);
@@ -154,8 +163,8 @@ async function checkLand() {
         circle = L.circle([latitude, longitude], {
             color: color,
             fillColor: color,
-            fillOpacity: 0.25,
-            radius: 300
+            fillOpacity: 0.15,
+            radius: 5000
         }).addTo(map);
 
         // ==========================
