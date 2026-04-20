@@ -100,7 +100,7 @@ function displayResult(data, locationName) {
 
         <div class="section">
             <div class="section-title">🌐 5km Context</div>
-            <div class="value" style="font-weight: 500; font-size: 14px; line-height: 1.6;">
+            <div class="value" style="font-weight: 500; line-height: 1.6;">
                🌾 Farming: ${data.farm_pct}% &nbsp;&nbsp;
                🏠 Res: ${data.res_pct}% &nbsp;&nbsp;
                🏭 Ind: ${data.ind_pct}% <br>
