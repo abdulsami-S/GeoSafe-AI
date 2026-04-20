@@ -1,15 +1,20 @@
 // ==========================
 // INIT MAP
 // ==========================
-var map = L.map('map').setView([13.0827, 80.2707], 10);
+var map = L.map('map', {
+    zoomControl: true,
+    preferCanvas: true   // 🔥 performance boost
+}).setView([13.0827, 80.2707], 10);
 
-// Fix white background
+// Fix background
 map.getContainer().style.background = "#ddd";
 
-// ✅ STANDARD OPENSTREETMAP TILE LAYER
+// Tile Layer (optimized)
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    attribution: '© OpenStreetMap contributors'
+    updateWhenZooming: false,
+    keepBuffer: 2,
+    attribution: '© OpenStreetMap'
 }).addTo(map);
 
 let marker;
@@ -77,12 +82,11 @@ function displayResult(data, locationName) {
             <div class="value">${data.terrain} (${data.elevation} m)</div>
         </div>
 
-        ${data.purpose.toLowerCase() === "residential" ? `
+        ${data.purpose && data.purpose.toLowerCase() === "residential" ? `
         <div class="section">
-            <div class="section-title">🏢 Buildings in Radius</div>
+            <div class="section-title">🏢 Buildings</div>
             <div class="value">${data.building_density}</div>
-        </div>
-        ` : ""}
+        </div>` : ""}
 
         <div class="section">
             <div class="section-title">🏛 Land Status</div>
@@ -95,11 +99,14 @@ function displayResult(data, locationName) {
         </div>
 
         <div class="section">
-            <div class="section-title">🌐 5km Surrounding Context</div>
-            <div class="value" style="font-weight: 500; font-size: 14px; opacity: 0.95;">
-               🌾 Farming: ${data.farm_pct}% <br>
-               🏠 Residential: ${data.res_pct}% <br>
-               🏭 Industrial: ${data.ind_pct}%
+            <div class="section-title">🌐 5km Context</div>
+            <div class="value" style="font-weight: 500; font-size: 14px; line-height: 1.6;">
+               🌾 Farming: ${data.farm_pct}% &nbsp;&nbsp;
+               🏠 Res: ${data.res_pct}% &nbsp;&nbsp;
+               🏭 Ind: ${data.ind_pct}% <br>
+               🌳 Forest: ${data.forest_pct}% &nbsp;&nbsp;
+               💧 Water: ${data.water_pct}% &nbsp;&nbsp;
+               ⬛ Other: ${data.other_pct}%
             </div>
         </div>
 
@@ -122,6 +129,7 @@ async function checkLand() {
     if (!lat || !lon) return alert("Enter coordinates");
     if (!purpose) return alert("Select purpose");
 
+    // Loading UI
     document.getElementById("result").innerHTML = `
         <h2>⏳ Analyzing Location...</h2>
         <p>AI is processing geographic data...</p>
@@ -138,24 +146,35 @@ async function checkLand() {
 
         const data = await res.json();
 
+        // Add purpose manually if backend missing
+        data.purpose = purpose;
+
         displayResult(data, locationName);
 
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lon);
 
-        map.flyTo([latitude, longitude], 12, { duration: 1.5 });
+        // Smooth zoom
+        map.flyTo([latitude, longitude], 13, { duration: 1.2 });
 
         if (marker) map.removeLayer(marker);
         if (circle) map.removeLayer(circle);
 
         // ==========================
-        // COLOR LOGIC (Based strongly on Risk Level)
+        // COLOR LOGIC (IMPROVED 🔥)
         // ==========================
         let color = "green";
 
         if (data.risk === "High") color = "red";
         else if (data.risk === "Medium") color = "orange";
 
+        // Override for govt land
+        if (data.gov_land) color = "blue";
+
+        // Override for road (highest priority)
+        if (data.on_road || (data.gov_type && data.gov_type.toLowerCase().includes("road"))) {
+            color = "black";
+        }
 
         // ==========================
         // CIRCLE
@@ -163,8 +182,8 @@ async function checkLand() {
         circle = L.circle([latitude, longitude], {
             color: color,
             fillColor: color,
-            fillOpacity: 0.15,
-            radius: 5000
+            fillOpacity: 0.25,
+            radius: 5000   // 5km (matches backend)
         }).addTo(map);
 
         // ==========================
@@ -176,12 +195,14 @@ async function checkLand() {
             iconAnchor: [12, 41]
         });
 
-        marker = L.marker([latitude, longitude], { icon }).addTo(map)
+        marker = L.marker([latitude, longitude], { icon })
+            .addTo(map)
             .bindPopup(`<b>${data.risk}</b><br>${data.explanation}`)
             .openPopup();
 
         marker.bindTooltip("Selected Location", {
-            direction: "top"
+            direction: "top",
+            offset: [0, -10]
         });
 
     } catch (err) {

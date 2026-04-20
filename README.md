@@ -43,6 +43,11 @@ graph TD
 4. **Logic Rules**: Hardcoded spatial logic checks for restricted zones (e.g., inside oceans, critical forests).
 5. **Insights Displayed**: The frontend visualizes the location, surrounding neighborhood, and safety classification on an interactive map.
 
+### 🎯 Dynamic Purpose Analysis
+The system intelligently adapts its recommendations based on the **"Purpose"** you select from the dropdown (General, Residential, Industrial, Farming):
+* **Compatibility Check**: The AI cross-references your selected purpose with the 5km geographic surroundings. For example, trying to validate land for "Industrial" use in an area that is dominantly 80% "Farming" will trigger an AI context warning.
+* **Smart Overrides**: Safety always comes first. If "Residential" is chosen inside a restricted government zone (like a coastline, river buffer, or public highway), the system overrides the ML model and strictly forces the Risk Level to **High**.
+
 ---
 
 ## 📊 Risk Classification

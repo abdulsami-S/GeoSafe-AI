@@ -34,11 +34,14 @@ forest_sindex = forest.sindex
 # =========================
 def fast_distance(gdf, sindex, point):
     try:
-        idx = list(sindex.nearest(point.bounds, 1))
+        # Buffer by 11km (11000 meters since EPSG:3857 is in meters) to grab candidates
+        idx = list(sindex.intersection(point.buffer(11000).bounds))
+        if not idx:
+            return 999.0
         nearest_geom = gdf.iloc[idx]
-        return nearest_geom.distance(point).min() / 1000  # km
+        return nearest_geom.distance(point).min() / 1000.0  # km
     except:
-        return 999
+        return 999.0
 
 # =========================
 # LOAD ELEVATION

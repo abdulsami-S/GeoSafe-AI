@@ -23,7 +23,6 @@ lakes = gpd.read_file("data/ne_10m_lakes.shp").to_crs(epsg=4326)
 rivers = gpd.read_file("data/ne_10m_rivers_lake_centerlines.shp").to_crs(epsg=4326)
 coast = gpd.read_file("data/ne_10m_coastline.shp").to_crs(epsg=4326)
 
-# Optimize
 ocean = ocean.simplify(0.01)
 lakes = lakes.simplify(0.01)
 
@@ -54,44 +53,52 @@ coast_sindex = coast.sindex
 # HELPERS
 # =========================
 def check_area(gdf, sindex, point):
-    possible = list(sindex.intersection(point.bounds))
-    return gdf.iloc[possible].contains(point).any()
+    idx = list(sindex.intersection(point.bounds))
+    if not idx:
+        return False
+    return gdf.iloc[idx].contains(point).any()
 
 def fast_distance(gdf, sindex, point):
     try:
-        possible = list(sindex.intersection(point.buffer(0.1).bounds))
-        nearby = gdf.iloc[possible]
+        # 1. Broad spatial index filter using a 0.1 degree (~11km) buffer
+        idx = list(sindex.intersection(point.buffer(0.1).bounds))
+        if not idx:
+            return 999.0
 
-        if len(nearby) == 0:
-            return 999
+        # 2. Extract ONLY nearby geometries before reprojecting
+        nearby = gdf.iloc[idx]
+        
+        # 3. Predict precise distance in meters
+        point_proj = gpd.GeoSeries([point], crs="EPSG:4326").to_crs(epsg=3857).iloc[0]
+        nearby_proj = nearby.to_crs(epsg=3857)
 
-        return nearby.distance(point).min()
+        # 4. Return in Kilometers
+        return nearby_proj.distance(point_proj).min() / 1000.0
     except:
-        return 999
+        return 999.0
 
 # =========================
 # BUILDINGS
 # =========================
 def get_buildings(lat, lon):
     try:
-        buffer = 0.003 # ~300 meters, strictly matching the visual circle
+        buffer = 0.003
         bbox = (lon-buffer, lat-buffer, lon+buffer, lat+buffer)
 
         buildings = gpd.read_file(
             "data/gis_osm_buildings_a_free_1.shp",
             bbox=bbox
         )
-
         return len(buildings)
     except:
         return 0
 
 # =========================
-# ROADS (FINAL FIXED VERSION)
+# ROADS (FIXED ✅)
 # =========================
 def get_roads_info(lat, lon):
     try:
-        buffer = 0.01
+        buffer = 0.005
         bbox = (lon-buffer, lat-buffer, lon+buffer, lat+buffer)
 
         roads = gpd.read_file(
@@ -99,19 +106,23 @@ def get_roads_info(lat, lon):
             bbox=bbox
         )
 
+        # Filter important roads
+        roads = roads[roads["fclass"].isin([
+            "primary", "secondary", "residential", "tertiary"
+        ])]
+
         if len(roads) == 0:
             return False, False, 0
 
-        # Convert to meters (important fix)
+        # Convert to EPSG:3857 only AFTER filtering the bbox chunk
         roads = roads.to_crs(epsg=3857)
         point = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326") \
                     .to_crs(epsg=3857).iloc[0]
 
-        distances = roads.distance(point)
-        min_dist = distances.min()
+        min_dist = roads.distance(point).min()
 
-        on_road = min_dist < 10      # meters
-        near_road = min_dist < 100   # meters
+        on_road = min_dist < 10
+        near_road = min_dist < 100
 
         return bool(on_road), bool(near_road), len(roads)
 
@@ -159,7 +170,7 @@ def terrain_type(e):
     return "Plain"
 
 # =========================
-# NEIGHBORHOOD 5KM ANALYSIS
+# SURROUNDINGS
 # =========================
 def analyze_surroundings(lat, lon, radius_km=5):
     try:
@@ -170,24 +181,38 @@ def analyze_surroundings(lat, lon, radius_km=5):
         buffer_4326 = gpd.GeoSeries([buffer_3857], crs="EPSG:3857").to_crs(epsg=4326).iloc[0]
         total_area = buffer_3857.area 
         
-        def get_area_pct(gdf, sindex):
+        def calc(gdf, sindex):
+            # Optimisation: intersection on spatial index BEFORE operation
             idx = list(sindex.intersection(buffer_4326.bounds))
-            if not idx: return 0
-            candidates = gdf.iloc[idx]
-            intersected = candidates.intersection(buffer_4326)
-            intersected = intersected[~intersected.is_empty]
-            if len(intersected) == 0: return 0
-            intersected_3857 = gpd.GeoSeries(intersected, crs="EPSG:4326").to_crs(epsg=3857)
-            return (intersected_3857.area.sum() / total_area) * 100
+            if not idx:
+                return 0
             
-        res_pct = round(get_area_pct(residential, residential_sindex), 1)
-        ind_pct = round(get_area_pct(industrial, industrial_sindex), 1)
-        farm_pct = round(get_area_pct(farmland, farmland_sindex), 1)
+            candidates = gdf.iloc[idx]
+            inter = candidates.intersection(buffer_4326)
+            inter = inter[~inter.is_empty]
+            
+            if len(inter) == 0:
+                return 0
+                
+            # Convert ONLY the tiny intersected subset to 3857 for precise percentage check
+            inter_3857 = gpd.GeoSeries(inter, crs="EPSG:4326").to_crs(epsg=3857)
+            return round((inter_3857.area.sum() / total_area) * 100, 1)
+            
+        res_pct = calc(residential, residential_sindex)
+        ind_pct = calc(industrial, industrial_sindex)
+        farm_pct = calc(farmland, farmland_sindex)
+        forest_pct = calc(forest, forest_sindex)
+        water_pct = round(calc(lakes, lakes_sindex) + calc(ocean, ocean_sindex), 1)
         
-        return res_pct, ind_pct, farm_pct
+        # Calculate exactly the remaining percentage
+        used_pct = round(res_pct + ind_pct + farm_pct + forest_pct + water_pct, 1)
+        other_pct = round(max(0, 100.0 - used_pct), 1)
+        
+        return res_pct, ind_pct, farm_pct, forest_pct, water_pct, other_pct
+
     except Exception as e:
-        print("Analysis Error:", e)
-        return 0, 0, 0
+        print("Surroundings Error:", e)
+        return 0, 0, 0, 0, 0, 100
 
 # =========================
 # API
@@ -196,17 +221,13 @@ def analyze_surroundings(lat, lon, radius_km=5):
 def check():
 
     data = request.json
-
     lat = float(data["lat"])
     lon = float(data["lon"])
-    purpose = data.get("purpose")
-
-    if not purpose:
-        return jsonify({"error": "Please select purpose"}), 400
+    purpose = data.get("purpose", "")
 
     point = Point(lon, lat)
 
-    # Spatial checks
+    # Checks
     in_residential = check_area(residential, residential_sindex, point)
     in_industrial = check_area(industrial, industrial_sindex, point)
     in_farmland = check_area(farmland, farmland_sindex, point)
@@ -215,34 +236,35 @@ def check():
     in_ocean = ocean.contains(point).any()
     in_lake = lakes.contains(point).any()
 
-    # Distances
     dist_river = fast_distance(rivers, rivers_sindex, point)
     dist_lake = fast_distance(lakes, lakes_sindex, point)
     dist_ocean = fast_distance(ocean, ocean_sindex, point)
     dist_forest = fast_distance(forest, forest_sindex, point)
 
-    near_river = dist_river < 0.01
-    near_coast = fast_distance(coast, coast_sindex, point) < 0.01
+    # Thresholds adjusted for KM
+    near_river = dist_river < 1.0
+    dist_coast = fast_distance(coast, coast_sindex, point)
+    near_coast = dist_coast < 1.0
 
-    # Features
     building_density = get_buildings(lat, lon)
     on_road, near_road, road_count = get_roads_info(lat, lon)
+
     elevation = get_elevation(lat, lon)
     terrain = terrain_type(elevation)
-
     slope = elevation * 0.1
 
-    # ML
+    # ML RESTORED TRUTH FEATURES (DO NOT ZERO THEM OUT)
+    terrain_val = 2 if elevation > 800 else (1 if elevation > 300 else 0)
     features = [[
         dist_river, 
         dist_lake, 
         dist_ocean, 
         dist_forest, 
         elevation, 
-        slope
+        terrain_val
     ]]
-    risk_map = {0: "Low", 1: "Medium", 2: "High"}
-    risk = risk_map.get(int(model.predict(features)[0]), "Medium")
+    # Predict returns [0] or [1] or [2] mapping to risk levels
+    risk = ["Low", "Medium", "High"][int(model.predict(features)[0])]
 
     # Land type
     if in_residential:
@@ -256,73 +278,87 @@ def check():
     else:
         land_type = "Urban" if building_density > 500 else "Rural"
 
-    # Government logic
+    # Government
     gov_land = False
     gov_type = "Private"
 
     if on_road:
         gov_land = True
-        gov_type = "Public Road Infrastructure"
+        gov_type = "Road"
     elif in_forest:
         gov_land = True
-        gov_type = "Forest Protected Land"
+        gov_type = "Forest"
     elif in_ocean or in_lake:
         gov_land = True
-        gov_type = "Water Body"
+        gov_type = "Water"
     elif near_river:
         gov_land = True
-        gov_type = "River Buffer Zone"
+        gov_type = "River Zone"
     elif near_coast:
         gov_land = True
         gov_type = "Coastal Zone"
-        
-    # Strict Risk Override for Government / Restricted Land
-    if gov_land and purpose.lower() == "residential":
+
+    # 🔥 FINAL RISK FIX
+    if on_road or gov_land:
         risk = "High"
 
-    # Neighborhood Context Calculation
-    res_pct, ind_pct, farm_pct = analyze_surroundings(lat, lon, 5)
+    # Surroundings
+    res_pct, ind_pct, farm_pct, forest_pct, water_pct, other_pct = analyze_surroundings(lat, lon)
 
-    surroundings_map = {"Residential": res_pct, "Industrial": ind_pct, "Farming": farm_pct}
-    dominant_surround = max(surroundings_map, key=surroundings_map.get)
-    max_pct = surroundings_map[dominant_surround]
+    # Re-implment dynamic reasoning
+    surroundings_map = {
+        "Residential": res_pct, 
+        "Industrial": ind_pct, 
+        "Farming": farm_pct,
+        "Forest": forest_pct,
+        "Water": water_pct,
+        "Open/Unclassified": other_pct
+    }
+    
+    # Exclude open space when finding the dominant *active* sector
+    active_map = {k: v for k, v in surroundings_map.items() if k != "Open/Unclassified"}
+    dominant_surround = max(active_map, key=active_map.get)
+    max_pct = active_map[dominant_surround]
     
     if max_pct == 0:
         dominant_surround = "Undeveloped / Open"
-        
-    ownership_status = "Government/Restricted Land" if gov_land else "Private Record"
-    if on_road:
-        ownership_status = "Public Road Infrastructure"
 
-    # Dynamic Explanation
-    explanation = f"Ownership: {ownership_status}. "
+    explanation = f"{land_type} land. Nearby → Residential:{res_pct}% Industrial:{ind_pct}% Farming:{farm_pct}% Forest:{forest_pct}% Water:{water_pct}% Other:{other_pct}%. "
 
-    if purpose.lower() == "general":
-        explanation += f"Based on surroundings, this land is best suited for {dominant_surround} development. "
+    dev_type = dominant_surround
+    if dominant_surround in ["Forest", "Water", "Undeveloped / Open"]:
+        dev_type = "conservation or natural preservation"
+    else:
+        dev_type = f"{dominant_surround.lower()} development"
+
+    # Intelligent AI insight based on chosen Purpose
+    if purpose.lower() == "general" or not purpose:
+        explanation += f"Based on surroundings, this land is best suited for {dev_type}."
     else:
         target_pct = surroundings_map.get(purpose.title(), 0)
-        if target_pct > 5 or land_type == purpose.title():
-            explanation += f"Suitable for {purpose} usage. Surrounding area implies compatibility. "
+        if target_pct > 5 or land_type.lower() == purpose.lower():
+            explanation += f"Suitable for {purpose} usage. Surrounding area implies compatibility."
         else:
-            explanation += f"May not be ideal for {purpose} based on surroundings. The dominant surrounding sector is {dominant_surround}. "
-    
-    if on_road:
-        explanation += "Warning: Exact location clashes directly with public road infrastructure. "
-    elif gov_land:
-        explanation += f"Warning: Exact location is restricted ({gov_type})."
+            explanation += f"May not be ideal for {purpose}. The dominant surrounding sector is {dominant_surround}."
 
-    # Response
+    if on_road:
+        explanation = "CRITICAL WARNING: Location is on public road infrastructure! " + explanation
+    elif gov_land:
+        explanation = f"CRITICAL WARNING: Location is restricted ({gov_type}). " + explanation
+
     return jsonify({
         "risk": risk,
         "purpose": purpose,
         "land_type": land_type,
         "terrain": terrain,
-        "elevation": round(elevation, 2),
+        "elevation": elevation,
         "building_density": building_density,
         "res_pct": res_pct,
         "ind_pct": ind_pct,
         "farm_pct": farm_pct,
-        "ownership": ownership_status,
+        "forest_pct": forest_pct,
+        "water_pct": water_pct,
+        "other_pct": other_pct,
         "on_road": on_road,
         "near_road": near_road,
         "nearby_roads_count": road_count,
@@ -331,8 +367,5 @@ def check():
         "explanation": explanation
     })
 
-# =========================
-# RUN
-# =========================
 if __name__ == "__main__":
     app.run(debug=True)
