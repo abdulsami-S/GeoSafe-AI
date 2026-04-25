@@ -1,18 +1,32 @@
-FROM osgeo/gdal:ubuntu-small-latest
+FROM python:3.11-slim
 
-# Install Python and pip
+# Install GDAL and spatial system dependencies
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
+    gdal-bin \
+    libgdal-dev \
+    libgeos-dev \
+    libproj-dev \
+    libspatialindex-dev \
     python3-dev \
     build-essential \
+    gcc \
+    g++ \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Set GDAL environment variables
+ENV GDAL_CONFIG=/usr/bin/gdal-config
+ENV CPLUS_INCLUDE_PATH=/usr/include/gdal
+ENV C_INCLUDE_PATH=/usr/include/gdal
+ENV GDAL_DATA=/usr/share/gdal
 
 WORKDIR /app
 
 # Copy requirements and install
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt --break-system-packages
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir GDAL==$(gdal-config --version) && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the app
 COPY . .

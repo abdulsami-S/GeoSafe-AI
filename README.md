@@ -1,134 +1,75 @@
-# 🌍 GeoSafe AI - Smart Land Analyzer (AI + ML + GIS)
+# GeoSafe AI - Smart Land Safety Analyzer
 
-Welcome to **GeoSafe AI**, an intelligent geospatial analysis system designed to evaluate land safety using **GIS datasets + Machine Learning**. Our system is built to provide clear, explainable, and real-time insights through a highly interactive map interface.
+GeoSafe AI is an advanced spatial intelligence tool that analyzes land for safety, environmental risks, and suitability using OpenStreetMap GIS data and Machine Learning. 
 
-Whether you're an urban planner, environmentalist, or an open-source contributor, this guide will help you understand how our tool works and how to set it up quickly!
+It evaluates a given coordinate against multiple factors like proximity to water bodies, forests, existing infrastructure, and elevation to determine an overall Risk Score (Low, Medium, High).
 
----
+![Landing Page](/screenshots/background.jpg) *(Replace with actual screenshot)*
 
-## 🚀 Features
+## Features
+- **Spatial Analysis**: Checks surrounding areas (up to 5km) for residential, industrial, and farming zones.
+- **Machine Learning**: Random Forest model trained on spatial data to predict land risk.
+- **Dynamic Explanations**: Generates plain-English insights so anyone can understand the results.
+- **Interactive Maps**: Powered by Leaflet and CartoDB Dark Matter tiles.
 
-* 📍 **Smart Location Search**: Accepts latitude & longitude input for precise analysis.
-* 🌍 **Comprehensive GIS Analysis**: Multi-layer spatial validation using real-world GIS data.
-* 🌊 **Water Body Detection**: Accurately detects ocean, lakes, rivers, and coastal zones.
-* 🌳 **Environmental Awareness**: Identifies forest regions and eco-sensitive areas.
-* 🤖 **AI-Driven Assessment**: Machine Learning-based risk prediction with ~90% accuracy.
-* ⚠️ **Risk Identification**: Highlights environmental and legal risks in real-time.
-* 🗺️ **Visual Context**: Interactive map with real-time land-use context overlays.
-* 📊 **Modern Dashboard**: Clean, responsive, and intuitive UI.
-
----
-
-## 🧠 System Architecture & Workflow
-
-Here is how data flows through GeoSafe AI to bring you actionable intelligence.
-
-```mermaid
-graph TD
-    A[User Input: Lat/Lon] -->|Via Frontend| B(Flask Backend API)
-    B --> C{Spatial Analysis Engine}
-    C -->|Query| D[(GIS Datasets: OSM, SRTM, Natural Earth)]
-    D -->|Distance & Elevation| C
-    C --> E[Machine Learning Engine]
-    E -->|Random Forest Classifier| F[Risk Prediction]
-    C --> G[Environmental & Legal Checks]
-    F & G --> H[JSON Response]
-    H -->|To Frontend| I[Leaflet Interactive Map & Dashboard]
-```
-
-### ⚙️ How It Works (Step-by-Step)
-1. **User Request**: You input a specific land coordinate (Latitude & Longitude).
-2. **Spatial Feature Extraction**: The backend checks GIS datasets (Natural Earth, OSM, SRTM) to compute spatial metrics (distance to rivers, forests, oceans, elevation, etc.).
-3. **ML Prediction**: These spatial metrics are fed into our Pre-Trained Random Forest Classifier.
-4. **Logic Rules**: Hardcoded spatial logic checks for restricted zones (e.g., inside oceans, critical forests).
-5. **Insights Displayed**: The frontend visualizes the location, surrounding neighborhood, and safety classification on an interactive map.
-
-### 🎯 Dynamic Purpose Analysis
-The system intelligently adapts its recommendations based on the **"Purpose"** you select from the dropdown (General, Residential, Industrial, Farming):
-* **Compatibility Check**: The AI cross-references your selected purpose with the 5km geographic surroundings. For example, trying to validate land for "Industrial" use in an area that is dominantly 80% "Farming" will trigger an AI context warning.
-* **Smart Overrides**: Safety always comes first. If "Residential" is chosen inside a restricted government zone (like a coastline, river buffer, or public highway), the system overrides the ML model and strictly forces the Risk Level to **High**.
+## Tech Stack
+- **Frontend**: Next.js 14, React, Tailwind CSS, Framer Motion, Leaflet
+- **Backend**: FastAPI, GeoPandas, Shapely, Scikit-Learn, Rasterio
+- **Deployment**: Docker Compose
 
 ---
 
-## 📊 Risk Classification
+## 🚀 How to Run Locally
 
-| Risk Level | Meaning | Actionable Insight |
-| ---------- | ------- | ------------------ |
-| 🟢 **Low** | Safe land | Ideal for development or agriculture. |
-| 🟡 **Medium** | Moderate risk | Potential environmental constraints exist. |
-| 🔴 **High** | Unsafe / restricted | Prohibited zones (e.g., in water bodies or deep forests). |
+### Option 1: Using Docker (Recommended)
+This is the easiest and most reliable way to run the project, as it automatically configures all the complex spatial libraries (GDAL) required by GeoPandas and Rasterio.
 
----
+1. Ensure you have [Docker](https://www.docker.com/) and Docker Compose installed.
+2. Clone the repository and navigate to the root directory.
+3. Build and start the containers:
+   ```bash
+   docker-compose up --build
+   ```
+4. Access the application:
+   - Frontend: `http://localhost:3000`
+   - Backend API Docs: `http://localhost:8000/docs`
 
-## 🖥️ Tech Stack
+### Option 2: Manual Setup
 
-**Backend & Data Processing**
-* Python (Flask API)
-* GeoPandas, Shapely, Rasterio
-* Scikit-learn (Random Forest)
+#### Backend (FastAPI)
+You will need system-level spatial libraries installed (e.g., GDAL, GEOS) for GeoPandas to work. On Windows, it is highly recommended to use WSL or Anaconda.
 
-**Frontend & Visualization**
-* Vanilla JavaScript (Leaflet.js)
-* HTML5, CSS3
-
----
-
-## ▶️ Getting Started
-
-Follow these steps to run the project locally.
-
-### 1️⃣ Install Dependencies
-
-Ensure you have Python installed, then install the required packages:
 ```bash
-pip install flask geopandas shapely rasterio pandas numpy scikit-learn flask-cors joblib
+cd backend
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Or `venv\Scripts\activate` on Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the API
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 2️⃣ Generate the Dataset & Train the ML Model
-
-The ML model needs to be trained on realistic geographical data before running the server.
+#### Frontend (Next.js)
 ```bash
-cd backend/ML
+cd frontend
+# Install dependencies
+npm install
 
-# Generate artificial but realistic spatial dataset
-python generate_data.py
-
-# Train the Random Forest Classifier
-python train_model.py
+# Run development server
+npm run dev
 ```
-
-### 3️⃣ Run the Backend Server
-
-Start the Flask API to process requests (make sure to return to the `backend` root folder):
-```bash
-cd ..
-python app.py
-```
-
-### 4️⃣ Open the Frontend Application
-
-With the backend running, just open the `frontend/index.html` file in any modern web browser to use the interface!
+Navigate to `http://localhost:3000`.
 
 ---
 
-## ⚡ Technical Optimizations
+## 👥 The Team
+- Abdul Sami
+- Thrivikram
+- Leela Yashwanth
+- Mohammad Samiullah
 
-We've optimized GeoSafe AI to be highly responsive and memory-efficient:
-* **Spatial Indexing (R-tree)**: Enables extremely fast GIS queries and bounding-box intersections.
-* **Smart Data Loading**: Uses optimized dataset bounding box queries to avoid loading massive shapefiles into memory.
-* **Parallel ML Training**: Uses multiple CPU cores (`n_jobs=-1`) for fast Random Forest training.
-* **CRS Transformation**: Ensures precise and accurate distance calculation globally.
-
----
-
-## 👨‍💻 Authors
-
-* **Abdul Sami**
-* **Thrivikram**
-* **Leela Yashwanth**
-* **Mohammad Samiullah**
-
----
-
-## ⭐ Support Us
-If you find this project useful or interesting, don't forget to **Star** this repository!
+## 📜 License
+MIT License
