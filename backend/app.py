@@ -1,14 +1,27 @@
 import geopandas as gpd
 from shapely.geometry import Point
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 import joblib
 import os
 import math
 import rasterio
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class CheckRequest(BaseModel):
+    lat: float
+    lon: float
+    purpose: str = ""
 
 # =========================
 # LOAD MODEL
@@ -217,13 +230,11 @@ def analyze_surroundings(lat, lon, radius_km=5):
 # =========================
 # API
 # =========================
-@app.route("/check", methods=["POST"])
-def check():
-
-    data = request.json
-    lat = float(data["lat"])
-    lon = float(data["lon"])
-    purpose = data.get("purpose", "")
+@app.post("/check")
+async def check(request_data: CheckRequest):
+    lat = request_data.lat
+    lon = request_data.lon
+    purpose = request_data.purpose
 
     point = Point(lon, lat)
 
@@ -346,7 +357,7 @@ def check():
     elif gov_land:
         explanation = f"CRITICAL WARNING: Location is restricted ({gov_type}). " + explanation
 
-    return jsonify({
+    return {
         "risk": risk,
         "purpose": purpose,
         "land_type": land_type,
@@ -365,7 +376,8 @@ def check():
         "gov_land": gov_land,
         "gov_type": gov_type,
         "explanation": explanation
-    })
+    }
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
