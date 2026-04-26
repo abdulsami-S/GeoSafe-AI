@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Map, Droplets, TreePine, AlertTriangle, CheckCircle2, Factory, Home, Tractor, Building } from "lucide-react";
+import { ArrowRight, Map, Droplets, TreePine, AlertTriangle, CheckCircle2, Factory, Home as HomeIcon, Tractor, Building } from "lucide-react";
 
 export default function Home() {
   return (
@@ -115,7 +115,7 @@ export default function Home() {
               { icon: TreePine, title: "Forest Awareness", desc: "Checks proximity to protected forest zones." },
               { icon: Factory, title: "Surrounding Analysis", desc: "Calculates % of nearby industrial/residential zones." },
               { icon: AlertTriangle, title: "Risk Score", desc: "Machine learning classification (Low/Medium/High)." },
-              { icon: Home, title: "Infrastructure", desc: "Detects proximity to roads and buildings." },
+              { icon: HomeIcon, title: "Infrastructure", desc: "Detects proximity to roads and buildings." },
               { icon: CheckCircle2, title: "Plain English Insights", desc: "AI explains the results so anyone can understand." }
             ].map((feature, i) => (
               <div key={i} className="glass-panel p-6 flex gap-4 hover:bg-white/5 transition-colors">
@@ -141,7 +141,7 @@ export default function Home() {
           
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: Home, title: "Urban Planners", desc: "Ensure new developments are safe and compliant." },
+              { icon: HomeIcon, title: "Urban Planners", desc: "Ensure new developments are safe and compliant." },
               { icon: Tractor, title: "Farmers", desc: "Find safe, suitable land for agriculture." },
               { icon: Building, title: "Investors", desc: "Assess risk before buying commercial real estate." },
               { icon: AlertTriangle, title: "Government", desc: "Monitor encroachments in restricted zones." }

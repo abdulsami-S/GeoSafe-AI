@@ -1,0 +1,10 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+*.log
+venv
+.env
+ML/land_safety_model.pkl
+ML/training_data.csv
+data/
