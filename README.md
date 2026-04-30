@@ -1,75 +1,117 @@
-# GeoSafe AI - Smart Land Safety Analyzer
+# 🌍 GeoSafe AI — Premium Land Intelligence Platform
 
-GeoSafe AI is an advanced spatial intelligence tool that analyzes land for safety, environmental risks, and suitability using OpenStreetMap GIS data and Machine Learning. 
+> **Transforming Complex Spatial Data into Actionable Safety Insights.**
 
-It evaluates a given coordinate against multiple factors like proximity to water bodies, forests, existing infrastructure, and elevation to determine an overall Risk Score (Low, Medium, High).
-
-![Landing Page](/screenshots/background.jpg) *(Replace with actual screenshot)*
-
-## Features
-- **Spatial Analysis**: Checks surrounding areas (up to 5km) for residential, industrial, and farming zones.
-- **Machine Learning**: Random Forest model trained on spatial data to predict land risk.
-- **Dynamic Explanations**: Generates plain-English insights so anyone can understand the results.
-- **Interactive Maps**: Powered by Leaflet and CartoDB Dark Matter tiles.
-
-## Tech Stack
-- **Frontend**: Next.js 14, React, Tailwind CSS, Framer Motion, Leaflet
-- **Backend**: FastAPI, GeoPandas, Shapely, Scikit-Learn, Rasterio
-- **Deployment**: Docker Compose
+GeoSafe AI is a state-of-the-art spatial intelligence platform designed to evaluate land safety, environmental risks, and developmental suitability. By combining **OpenStreetMap (GIS) data**, **High-Resolution Elevation Models**, and **Machine Learning**, it provides users with a comprehensive "Risk Score" and plain-English explanations for any coordinate on Earth.
 
 ---
 
-## 🚀 How to Run Locally
+## 📊 System Workflows
 
-### Option 1: Using Docker (Recommended)
-This is the easiest and most reliable way to run the project, as it automatically configures all the complex spatial libraries (GDAL) required by GeoPandas and Rasterio.
+### 🛡️ For Everyone (Non-Technical Flow)
+*Understanding how GeoSafe AI helps you make safer decisions.*
 
-1. Ensure you have [Docker](https://www.docker.com/) and Docker Compose installed.
-2. Clone the repository and navigate to the root directory.
-3. Build and start the containers:
-   ```bash
-   docker-compose up --build
-   ```
-4. Access the application:
-   - Frontend: `http://localhost:3000`
-   - Backend API Docs: `http://localhost:8000/docs`
+```mermaid
+graph TD
+    A[📍 Pick a Location] --> B{🔍 AI Analysis}
+    B --> C[🌊 Checks Water Risk]
+    B --> D[🌲 Checks Forest Proximity]
+    B --> E[🏗️ Checks Infrastructure]
+    C & D & E --> F[📋 Simple Safety Report]
+    F --> G[✅ Decision Made Easy]
+```
 
-### Option 2: Manual Setup
+### ⚙️ Under the Hood (Technical Pipeline)
+*The architecture powering our spatial intelligence.*
 
-#### Backend (FastAPI)
-You will need system-level spatial libraries installed (e.g., GDAL, GEOS) for GeoPandas to work. On Windows, it is highly recommended to use WSL or Anaconda.
+```mermaid
+sequenceDiagram
+    participant User as 💻 Next.js Frontend
+    participant API as ⚡ FastAPI Backend
+    participant GIS as 🗺️ GeoPandas Engine
+    participant ML as 🧠 Random Forest Model
 
+    User->>API: POST /check (Lat, Lon)
+    API->>GIS: Fetch OSM & Elevation Data
+    GIS->>GIS: Spatial Buffer & Join Operations
+    GIS->>API: Calculated Features (Distances, Pct)
+    API->>ML: Run Inference
+    ML->>API: Risk Score (Low/Med/High)
+    API->>User: JSON Response + AI Reasoning
+```
+
+---
+
+## ✨ Key Features
+
+- **🎯 Precision Analysis**: Evaluates land against multiple layers (Water, Roads, Forests, Industrial zones).
+- **🧠 ML-Powered Risk Scoring**: Uses a Random Forest classifier trained on thousands of spatial data points.
+- **⛰️ Terrain Awareness**: Integrates elevation data to determine if a site is a Plain, Hill, or Mountain.
+- **🛰️ Real-Time OSM Integration**: Live extraction of building density and road networks.
+- **📝 Human-Centric Insights**: Automatically generates clear explanations (e.g., *"Suitable for residential use, but close to a flood zone"*).
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Frontend** | ![Next.js](https://img.shields.io/badge/Next.js-000?style=flat&logo=next.js) | High-performance dashboard |
+| **Backend** | ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white) | Async AI & GIS API |
+| **Spatial** | ![GeoPandas](https://img.shields.io/badge/GeoPandas-152126?style=flat&logo=pandas&logoColor=white) | Vector data processing |
+| **ML Engine** | ![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-F7931E?style=flat&logo=scikit-learn&logoColor=white) | Risk prediction model |
+| **Mapping** | ![Leaflet](https://img.shields.io/badge/Leaflet-199900?style=flat&logo=leaflet&logoColor=white) | Interactive map UI |
+
+---
+
+## 🚀 Getting Started
+
+### The Quick Start (Windows)
+We've automated the setup for you. Just run:
+```powershell
+.\start.bat
+```
+*This will automatically install dependencies and launch both the backend (Port 8000) and frontend (Port 3000).*
+
+### Manual Setup
+
+#### 1. Backend (FastAPI)
 ```bash
 cd backend
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Or `venv\Scripts\activate` on Windows
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Run the API
-uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+uvicorn app:app --reload
 ```
 
-#### Frontend (Next.js)
+#### 2. Frontend (Next.js)
 ```bash
 cd frontend
-# Install dependencies
 npm install
-
-# Run development server
 npm run dev
 ```
-Navigate to `http://localhost:3000`.
+
+---
+
+## 📂 Project Structure
+
+```text
+GeoSafe-AI/
+├── 📂 backend/           # FastAPI, ML Models, GIS Logic
+│   ├── 📂 ML/            # Trained models & training scripts
+│   ├── 📂 data/          # GeoJSON/Shapefiles (GIS data)
+│   └── app.py            # Main API Entry
+├── 📂 frontend/          # Next.js 14 Application
+│   ├── 📂 src/app/       # Routes & Pages
+│   └── 📂 src/components/# UI Components (Maps, Navbar)
+└── start.bat             # One-click launch script
+```
 
 ---
 
 ## 👥 The Team
-- Abdul Sami
-- Thrivikram
-- Leela Yashwanth
-- Mohammad Samiullah
+- **Abdul Sami**
+- **Thrivikram**
+- **Leela Yashwanth**
+- **Mohammad Samiullah**
 
-## 📜 License
-MIT License
+---
+<p align="center">Built with ❤️ for a Safer Planet.</p>
