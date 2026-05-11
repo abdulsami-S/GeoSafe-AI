@@ -18,3 +18,9 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+node_modules/
+__MACOSX/
+.env
+dist/
+build/
