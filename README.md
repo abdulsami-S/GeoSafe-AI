@@ -105,13 +105,4 @@ GeoSafe-AI/
 └── start.bat             # One-click launch script
 ```
 
----
-
-## 👥 The Team
-- **Abdul Sami (23BCS119)**
-- **Thrivikram (23BCS100)**
-- **Leela Yashwanth (23BCS079)**
-- **Mohammad Samiullah (23BCS120)**
-
----
 <p align="center">Built with ❤️ for a Safer Planet.</p>
