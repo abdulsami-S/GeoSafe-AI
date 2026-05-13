@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Map, ShieldAlert } from "lucide-react";
+import { Map } from "lucide-react";
 
 export default function Navbar() {
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -48,12 +48,15 @@ function MapClickHandler({ onLocationSelect }: { onLocationSelect: (lat: number,
   return null;
 }
 
-export default function Map({ lat, lon, onLocationSelect, riskLevel, readOnly }: MapProps) {
-  const [mounted, setMounted] = useState(false);
+// useSyncExternalStore with no-op subscribe gives false on the server (SSR)
+// and true on the client — the idiomatic Next.js way to guard client-only
+// code without calling setState inside a useEffect body.
+const subscribe = () => () => {};
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+export default function Map({ lat, lon, onLocationSelect, riskLevel, readOnly }: MapProps) {
+  // Returns false during SSR/hydration, true once mounted on the client.
+  // No useEffect, no extra re-render cycle, no setState-in-effect lint error.
+  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
 
   if (!mounted) {
     return <div className="w-full h-full bg-background flex items-center justify-center">Loading map...</div>;

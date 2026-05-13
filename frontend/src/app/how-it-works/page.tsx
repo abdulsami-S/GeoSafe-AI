@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Layers, Cpu, ShieldAlert, ChevronDown, ChevronUp } from "lucide-react";
+import { MapPin, Layers, Cpu, ShieldAlert, ChevronDown, ChevronUp, LucideIcon } from "lucide-react";
 
 export default function HowItWorksPage() {
   return (
@@ -51,7 +51,15 @@ export default function HowItWorksPage() {
   );
 }
 
-function Step({ number, icon: Icon, title, description, tech }: any) {
+interface StepProps {
+  number: number;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  tech: string;
+}
+
+function Step({ number, icon: Icon, title, description, tech }: StepProps) {
   const [showTech, setShowTech] = useState(false);
 
   return (

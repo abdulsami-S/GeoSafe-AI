@@ -25,165 +25,214 @@ class CheckRequest(BaseModel):
     lon: float
     purpose: str = ""
 
-# =========================
-# RESULT CACHE
-# =========================
-# Keys are (lat_rounded_3dp, lon_rounded_3dp, purpose_lower).
-# ~111 m precision — close enough that the same field won't change.
-# Max 512 entries; oldest are evicted when the limit is reached.
+# =============================================================================
+# PERF 2 — IN-MEMORY RESULT CACHE
+# =============================================================================
+# Keys   : (lat_rounded_3dp, lon_rounded_3dp, purpose_lower)
+# ~111 m spatial precision — same parcel won't differ between queries.
+# Max 512 entries; oldest entry evicted when limit is reached (Python 3.7+
+# dicts maintain insertion order so next(iter(…)) gives the FIFO entry).
+# =============================================================================
 _result_cache: dict = {}
 _CACHE_MAX = 512
 
 def _cache_key(lat: float, lon: float, purpose: str) -> tuple:
     return (round(lat, 3), round(lon, 3), purpose.strip().lower())
 
-# =========================
+# =============================================================================
 # LOAD MODEL
-# =========================
+# =============================================================================
 model = joblib.load("ML/model.pkl")
 
-# =========================
-# LOAD GIS DATA
-# =========================
-ocean = gpd.read_file("data/ne_10m_ocean.shp").to_crs(epsg=4326)
-lakes = gpd.read_file("data/ne_10m_lakes.shp").to_crs(epsg=4326)
+# =============================================================================
+# PERF 1 — STARTUP GIS SHAPEFILE LOADING (natural earth layers)
+# =============================================================================
+# WHY: gpd.read_file() is expensive — it involves disk I/O, GDAL parsing,
+# and CRS projection. Loading every shapefile ONCE at process startup means
+# zero I/O for all subsequent requests. The GeoDataFrames live in RAM for
+# the entire lifetime of the server process.
+#
+# All layers are projected to EPSG:4326 here so per-request code never has
+# to reproject the full dataset — only tiny candidate subsets are reprojected
+# in fast_distance().
+# =============================================================================
+print("[startup] Loading natural-earth layers…")
+ocean  = gpd.read_file("data/ne_10m_ocean.shp").to_crs(epsg=4326)
+lakes  = gpd.read_file("data/ne_10m_lakes.shp").to_crs(epsg=4326)
 rivers = gpd.read_file("data/ne_10m_rivers_lake_centerlines.shp").to_crs(epsg=4326)
-coast = gpd.read_file("data/ne_10m_coastline.shp").to_crs(epsg=4326)
+coast  = gpd.read_file("data/ne_10m_coastline.shp").to_crs(epsg=4326)
 
-# BUG 5 FIX: .simplify() returns a GeoSeries, not a GeoDataFrame.
-# Assigning it back loses all columns and CRS metadata.
-# Apply simplify only to the geometry column so the GeoDataFrame is preserved.
+# .simplify() on the geometry column only — preserves CRS + all attribute
+# columns on the GeoDataFrame (assigning to the full frame would drop them).
 ocean.geometry = ocean.geometry.simplify(0.01)
 lakes.geometry = lakes.geometry.simplify(0.01)
 
-# =========================
-# LANDUSE
-# =========================
-landuse = gpd.read_file("data/gis_osm_landuse_a_free_1.shp").to_crs(epsg=4326)
-
+# =============================================================================
+# LANDUSE — loaded once at startup
+# =============================================================================
+print("[startup] Loading landuse layer…")
+landuse     = gpd.read_file("data/gis_osm_landuse_a_free_1.shp").to_crs(epsg=4326)
 residential = landuse[landuse["fclass"] == "residential"]
-industrial = landuse[landuse["fclass"] == "industrial"]
-farmland = landuse[landuse["fclass"] == "farmland"]
-forest = landuse[landuse["fclass"] == "forest"]
+industrial  = landuse[landuse["fclass"] == "industrial"]
+farmland    = landuse[landuse["fclass"] == "farmland"]
+forest      = landuse[landuse["fclass"] == "forest"]
 
-# =========================
-# SPATIAL INDEX
-# =========================
+# =============================================================================
+# PERF 3a — PRE-LOAD BUILDINGS AT STARTUP + R-TREE INDEX
+# =============================================================================
+# PREVIOUSLY: get_buildings() called gpd.read_file(…, bbox=bbox) on EVERY
+# request — that is a full disk read for a bbox slice of the file, which still
+# involves opening the file, parsing the header, and reading matched pages.
+#
+# NOW: Load the entire buildings shapefile once, build an R-tree spatial index
+# on it, then at query time do an O(log n) index intersection to retrieve only
+# the candidate rows — zero disk I/O after startup.
+# =============================================================================
+print("[startup] Loading buildings shapefile…")
+buildings_gdf    = gpd.read_file("data/gis_osm_buildings_a_free_1.shp").to_crs(epsg=4326)
+buildings_sindex = buildings_gdf.sindex   # R-tree built once here
+print(f"[startup] {len(buildings_gdf):,} buildings loaded.")
+
+# =============================================================================
+# PERF 3b — PRE-LOAD ROADS AT STARTUP + R-TREE INDEX
+# =============================================================================
+# Same rationale as buildings above. Additionally we pre-filter to only the
+# road classes we use, reducing both RAM usage and index size.
+# =============================================================================
+print("[startup] Loading roads shapefile…")
+_roads_raw = gpd.read_file("data/gis_osm_roads_free_1.shp").to_crs(epsg=4326)
+roads_gdf  = _roads_raw[_roads_raw["fclass"].isin([
+    "primary", "secondary", "residential", "tertiary"
+])].copy()
+del _roads_raw                            # release the unfiltered frame
+roads_sindex = roads_gdf.sindex          # R-tree built once here
+print(f"[startup] {len(roads_gdf):,} road segments loaded.")
+
+# =============================================================================
+# PERF 3 (VERIFY) — R-TREE INDEXES FOR ALL SPATIAL LAYERS
+# =============================================================================
+# GeoDataFrame.sindex is a libspatialindex R-tree. Accessing it here at
+# startup forces the index to be built now (the first access is when the cost
+# is paid). All subsequent sindex.intersection() calls are O(log n).
+# =============================================================================
 residential_sindex = residential.sindex
-industrial_sindex = industrial.sindex
-farmland_sindex = farmland.sindex
-forest_sindex = forest.sindex
+industrial_sindex  = industrial.sindex
+farmland_sindex    = farmland.sindex
+forest_sindex      = forest.sindex
+rivers_sindex      = rivers.sindex
+lakes_sindex       = lakes.sindex
+ocean_sindex       = ocean.sindex
+coast_sindex       = coast.sindex
+print("[startup] All R-tree indexes ready.")
 
-rivers_sindex = rivers.sindex
-lakes_sindex = lakes.sindex
-ocean_sindex = ocean.sindex
-coast_sindex = coast.sindex
-
-# =========================
-# HELPERS
-# =========================
+# =============================================================================
+# HELPERS — each uses an R-tree pre-filter before exact geometry tests
+# =============================================================================
 def check_area(gdf, sindex, point):
+    """
+    Point-in-polygon with R-tree pre-filter.
+
+    sindex.intersection(bounds) returns the subset of row indices whose
+    bounding boxes overlap the query point — O(log n). Only those candidates
+    undergo the exact .contains() test — O(k) where k << n.
+    """
     idx = list(sindex.intersection(point.bounds))
     if not idx:
         return False
     return gdf.iloc[idx].contains(point).any()
 
+
 def fast_distance(gdf, sindex, point):
+    """
+    Nearest-geometry distance with R-tree pre-filter.
+
+    A 0.1° (~11 km) buffer bounding box is used to query the R-tree so only
+    nearby geometries are reprojected and measured.
+    """
     try:
-        # 1. Broad spatial index filter using a 0.1 degree (~11km) buffer
         idx = list(sindex.intersection(point.buffer(0.1).bounds))
         if not idx:
             return 999.0
 
-        # 2. Extract ONLY nearby geometries before reprojecting
-        nearby = gdf.iloc[idx]
-        
-        # 3. Predict precise distance in meters
-        point_proj = gpd.GeoSeries([point], crs="EPSG:4326").to_crs(epsg=3857).iloc[0]
+        nearby      = gdf.iloc[idx]
+        point_proj  = gpd.GeoSeries([point], crs="EPSG:4326").to_crs(epsg=3857).iloc[0]
         nearby_proj = nearby.to_crs(epsg=3857)
-
-        # 4. Return in Kilometers
         return nearby_proj.distance(point_proj).min() / 1000.0
-    except Exception:  # BUG 9 FIX: bare except catches SystemExit/KeyboardInterrupt
+    except Exception:
         return 999.0
 
-# =========================
-# BUILDINGS
-# =========================
-def get_buildings(lat, lon):
-    try:
-        buffer = 0.003
-        bbox = (lon-buffer, lat-buffer, lon+buffer, lat+buffer)
 
-        buildings = gpd.read_file(
-            "data/gis_osm_buildings_a_free_1.shp",
-            bbox=bbox
-        )
-        return len(buildings)
-    except Exception:  # BUG 9 FIX
+# =============================================================================
+# BUILDINGS — in-memory R-tree lookup (no disk I/O after startup)
+# =============================================================================
+def get_buildings(lat: float, lon: float) -> int:
+    """
+    Count buildings within ~300 m using the in-memory R-tree.
+
+    Before: gpd.read_file(…, bbox=bbox) on every request  → disk I/O, slow.
+    After : buildings_sindex.intersection(bbox)            → O(log n), fast.
+    """
+    try:
+        buffer = 0.003  # ≈ 300 m in decimal degrees at mid-latitudes
+        bbox   = (lon - buffer, lat - buffer, lon + buffer, lat + buffer)
+        idx    = list(buildings_sindex.intersection(bbox))
+        return len(idx)
+    except Exception:
         return 0
 
-# =========================
-# ROADS (FIXED ✅)
-# =========================
-def get_roads_info(lat, lon):
+
+# =============================================================================
+# ROADS — in-memory R-tree lookup (no disk I/O after startup)
+# =============================================================================
+def get_roads_info(lat: float, lon: float):
+    """
+    Find roads within ~500 m and measure distance to nearest.
+
+    Before: gpd.read_file(…, bbox=bbox) on every request  → disk I/O, slow.
+    After : roads_sindex.intersection(bbox)                → O(log n), fast.
+    """
     try:
-        buffer = 0.005
-        bbox = (lon-buffer, lat-buffer, lon+buffer, lat+buffer)
+        buffer = 0.005  # ≈ 500 m in decimal degrees
+        bbox   = (lon - buffer, lat - buffer, lon + buffer, lat + buffer)
+        idx    = list(roads_sindex.intersection(bbox))
 
-        roads = gpd.read_file(
-            "data/gis_osm_roads_free_1.shp",
-            bbox=bbox
-        )
-
-        # Filter important roads
-        roads = roads[roads["fclass"].isin([
-            "primary", "secondary", "residential", "tertiary"
-        ])]
-
-        if len(roads) == 0:
+        if not idx:
             return False, False, 0
 
-        # Convert to EPSG:3857 only AFTER filtering the bbox chunk
-        roads = roads.to_crs(epsg=3857)
-        point = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326") \
-                    .to_crs(epsg=3857).iloc[0]
+        roads_nearby = roads_gdf.iloc[idx].to_crs(epsg=3857)
+        point_proj   = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326") \
+                           .to_crs(epsg=3857).iloc[0]
 
-        min_dist = roads.distance(point).min()
-
-        on_road = min_dist < 10
+        min_dist  = roads_nearby.distance(point_proj).min()
+        on_road   = min_dist < 10
         near_road = min_dist < 100
 
-        return bool(on_road), bool(near_road), len(roads)
-
-    except Exception:  # BUG 9 FIX
+        return bool(on_road), bool(near_road), len(idx)
+    except Exception:
         return False, False, 0
 
-# =========================
-# ELEVATION
-# =========================
+
+# =============================================================================
+# ELEVATION — per-tile open + in-memory value cache (already optimised)
+# =============================================================================
 ELEVATION_FOLDER = "data/elevation"
-elevation_cache = {}
+elevation_cache: dict = {}
 
 def get_tile(lat, lon):
-    lat_floor = int(math.floor(abs(lat)))
-    lon_floor = int(math.floor(abs(lon)))
-
-    # BUG 6 FIX: The original only matched 'n' (north) and 'e' (east) prefixes.
-    # Coordinates in the Southern or Western hemispheres silently returned
-    # elevation=0. Now we build the correct prefix for all four quadrants.
+    lat_floor  = int(math.floor(abs(lat)))
+    lon_floor  = int(math.floor(abs(lon)))
     lat_prefix = "n" if lat >= 0 else "s"
     lon_prefix = "e" if lon >= 0 else "w"
 
     for f in os.listdir(ELEVATION_FOLDER):
         f_lower = f.lower()
-        if f"{lat_prefix}{lat_floor:02d}" in f_lower and f"{lon_prefix}{lon_floor:03d}" in f_lower:
+        if (f"{lat_prefix}{lat_floor:02d}" in f_lower
+                and f"{lon_prefix}{lon_floor:03d}" in f_lower):
             return os.path.join(ELEVATION_FOLDER, f)
     return None
 
 def get_elevation(lat, lon):
     key = (round(lat, 3), round(lon, 3))
-
     if key in elevation_cache:
         return elevation_cache[key]
 
@@ -196,71 +245,66 @@ def get_elevation(lat, lon):
             val = float(list(src.sample([(lon, lat)]))[0][0])
             elevation_cache[key] = val
             return val
-    except Exception:  # BUG 9 FIX
+    except Exception:
         return 0
 
 def terrain_type(e):
-    if e > 800:
-        return "Mountain"
-    elif e > 300:
-        return "Hill"
+    if e > 800: return "Mountain"
+    if e > 300: return "Hill"
     return "Plain"
 
-# =========================
-# SURROUNDINGS
-# =========================
+
+# =============================================================================
+# SURROUNDINGS — fully R-tree indexed via calc()
+# =============================================================================
 def analyze_surroundings(lat, lon, radius_km=5):
     try:
-        pt_4326 = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326")
-        pt_3857 = pt_4326.to_crs(epsg=3857).iloc[0]
-        
-        buffer_3857 = pt_3857.buffer(radius_km * 1000)
-        buffer_4326 = gpd.GeoSeries([buffer_3857], crs="EPSG:3857").to_crs(epsg=4326).iloc[0]
-        total_area = buffer_3857.area 
-        
+        pt_4326    = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326")
+        pt_3857    = pt_4326.to_crs(epsg=3857).iloc[0]
+        buf_3857   = pt_3857.buffer(radius_km * 1000)
+        buf_4326   = gpd.GeoSeries([buf_3857], crs="EPSG:3857").to_crs(epsg=4326).iloc[0]
+        total_area = buf_3857.area
+
         def calc(gdf, sindex):
-            # Optimisation: intersection on spatial index BEFORE operation
-            idx = list(sindex.intersection(buffer_4326.bounds))
+            idx = list(sindex.intersection(buf_4326.bounds))  # R-tree filter
             if not idx:
                 return 0
-            
             candidates = gdf.iloc[idx]
-            inter = candidates.intersection(buffer_4326)
+            inter = candidates.intersection(buf_4326)
             inter = inter[~inter.is_empty]
-            
             if len(inter) == 0:
                 return 0
-                
-            # Convert ONLY the tiny intersected subset to 3857 for precise percentage check
             inter_3857 = gpd.GeoSeries(inter, crs="EPSG:4326").to_crs(epsg=3857)
             return round((inter_3857.area.sum() / total_area) * 100, 1)
-            
-        res_pct = calc(residential, residential_sindex)
-        ind_pct = calc(industrial, industrial_sindex)
-        farm_pct = calc(farmland, farmland_sindex)
-        forest_pct = calc(forest, forest_sindex)
-        water_pct = round(calc(lakes, lakes_sindex) + calc(ocean, ocean_sindex), 1)
-        
-        # Calculate exactly the remaining percentage
-        used_pct = round(res_pct + ind_pct + farm_pct + forest_pct + water_pct, 1)
+
+        res_pct    = calc(residential, residential_sindex)
+        ind_pct    = calc(industrial,  industrial_sindex)
+        farm_pct   = calc(farmland,    farmland_sindex)
+        forest_pct = calc(forest,      forest_sindex)
+        water_pct  = round(calc(lakes, lakes_sindex) + calc(ocean, ocean_sindex), 1)
+
+        used_pct  = round(res_pct + ind_pct + farm_pct + forest_pct + water_pct, 1)
         other_pct = round(max(0, 100.0 - used_pct), 1)
-        
+
         return res_pct, ind_pct, farm_pct, forest_pct, water_pct, other_pct
 
     except Exception as e:
         print("Surroundings Error:", e)
         return 0, 0, 0, 0, 0, 100
 
-# =========================
-# API
-# =========================
-# =========================
+
+# =============================================================================
 # UTILITY ENDPOINTS
-# =========================
+# =============================================================================
 @app.get("/health")
 async def health():
-    """Quick liveness probe — also reports cache size."""
-    return {"status": "ok", "cached_results": len(_result_cache)}
+    """Liveness probe — also reports runtime cache statistics."""
+    return {
+        "status": "ok",
+        "cached_results":  len(_result_cache),
+        "buildings_loaded": len(buildings_gdf),
+        "roads_loaded":     len(roads_gdf),
+    }
 
 @app.delete("/cache/clear")
 async def clear_cache():
@@ -268,18 +312,19 @@ async def clear_cache():
     _result_cache.clear()
     return {"status": "cleared"}
 
-# =========================
+
+# =============================================================================
 # SYNC ANALYSIS WORKER
-# =========================
+# =============================================================================
 def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     """
     All GIS + ML work lives here — purely synchronous.
-    Called via run_in_executor so it runs in a thread-pool
-    worker and does NOT block uvicorn's async event loop.
+    Called via run_in_executor() so it runs in a thread-pool worker and does
+    NOT block uvicorn's async event loop.
     """
     point = Point(lon, lat)
 
-    # Containment checks (all R-tree indexed via check_area)
+    # Containment checks — all R-tree indexed via check_area()
     in_residential = check_area(residential, residential_sindex, point)
     in_industrial  = check_area(industrial,  industrial_sindex,  point)
     in_farmland    = check_area(farmland,     farmland_sindex,    point)
@@ -287,7 +332,7 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     in_ocean       = check_area(ocean,        ocean_sindex,       point)
     in_lake        = check_area(lakes,        lakes_sindex,       point)
 
-    # Distance queries (all R-tree indexed via fast_distance)
+    # Distance queries — all R-tree indexed via fast_distance()
     dist_river  = fast_distance(rivers, rivers_sindex, point)
     dist_lake   = fast_distance(lakes,  lakes_sindex,  point)
     dist_ocean  = fast_distance(ocean,  ocean_sindex,  point)
@@ -297,7 +342,8 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     near_river = dist_river < 1.0
     near_coast = dist_coast < 1.0
 
-    building_density              = get_buildings(lat, lon)
+    # In-memory building/road lookups — PERF 3 (no disk I/O)
+    building_density               = get_buildings(lat, lon)
     on_road, near_road, road_count = get_roads_info(lat, lon)
 
     elevation   = get_elevation(lat, lon)
@@ -305,16 +351,16 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     terrain_val = 2 if elevation > 800 else (1 if elevation > 300 else 0)
 
     features = [[dist_river, dist_lake, dist_ocean, dist_forest, elevation, terrain_val]]
-    risk = ["Low", "Medium", "High"][int(model.predict(features)[0])]
+    risk     = ["Low", "Medium", "High"][int(model.predict(features)[0])]
 
-    # Land type
+    # Land type classification
     if in_residential:  land_type = "Residential"
     elif in_industrial: land_type = "Industrial"
     elif in_farmland:   land_type = "Farmland"
     elif in_forest:     land_type = "Forest"
     else:               land_type = "Urban" if building_density > 500 else "Rural"
 
-    # Government land
+    # Government / restricted land
     gov_land = False
     gov_type = "Private"
     if on_road:               gov_land, gov_type = True, "Road"
@@ -326,25 +372,30 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     if on_road or gov_land:
         risk = "High"
 
-    # Surroundings
-    res_pct, ind_pct, farm_pct, forest_pct, water_pct, other_pct = analyze_surroundings(lat, lon)
+    # Surroundings breakdown
+    res_pct, ind_pct, farm_pct, forest_pct, water_pct, other_pct = \
+        analyze_surroundings(lat, lon)
 
-    surroundings_map = {
+    surroundings_map  = {
         "Residential": res_pct, "Industrial": ind_pct, "Farming": farm_pct,
-        "Forest": forest_pct, "Water": water_pct, "Open/Unclassified": other_pct
+        "Forest": forest_pct,   "Water": water_pct,    "Open/Unclassified": other_pct,
     }
-    active_map       = {k: v for k, v in surroundings_map.items() if k != "Open/Unclassified"}
+    active_map        = {k: v for k, v in surroundings_map.items() if k != "Open/Unclassified"}
     dominant_surround = max(active_map, key=active_map.get)
     if active_map[dominant_surround] == 0:
         dominant_surround = "Undeveloped / Open"
 
-    dev_type = ("conservation or natural preservation"
-                if dominant_surround in ["Forest", "Water", "Undeveloped / Open"]
-                else f"{dominant_surround.lower()} development")
+    dev_type = (
+        "conservation or natural preservation"
+        if dominant_surround in ["Forest", "Water", "Undeveloped / Open"]
+        else f"{dominant_surround.lower()} development"
+    )
 
-    explanation = (f"{land_type} land. Nearby → Residential:{res_pct}% "
-                   f"Industrial:{ind_pct}% Farming:{farm_pct}% "
-                   f"Forest:{forest_pct}% Water:{water_pct}% Other:{other_pct}%. ")
+    explanation = (
+        f"{land_type} land. Nearby → Residential:{res_pct}% "
+        f"Industrial:{ind_pct}% Farming:{farm_pct}% "
+        f"Forest:{forest_pct}% Water:{water_pct}% Other:{other_pct}%. "
+    )
 
     if purpose.lower() == "general" or not purpose:
         explanation += f"Based on surroundings, this land is best suited for {dev_type}."
@@ -353,7 +404,10 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
         if target_pct > 5 or land_type.lower() == purpose.lower():
             explanation += f"Suitable for {purpose} usage. Surrounding area implies compatibility."
         else:
-            explanation += f"May not be ideal for {purpose}. The dominant surrounding sector is {dominant_surround}."
+            explanation += (
+                f"May not be ideal for {purpose}. "
+                f"The dominant surrounding sector is {dominant_surround}."
+            )
 
     if on_road:
         explanation = "CRITICAL WARNING: Location is on public road infrastructure! " + explanation
@@ -370,34 +424,39 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
         "gov_land": gov_land, "gov_type": gov_type, "explanation": explanation,
     }
 
+
+# =============================================================================
+# /check — main analysis endpoint
+# =============================================================================
 @app.post("/check")
 async def check(request_data: CheckRequest):
     lat     = request_data.lat
     lon     = request_data.lon
     purpose = request_data.purpose
 
-    # ── PERF 2: Result cache ─────────────────────────────────────────
-    # Round to 3 decimal places (~111 m) before looking up the cache.
-    # Same field queried twice with the same purpose → instant return.
+    # ── PERF 2: Result cache ──────────────────────────────────────────────────
+    # Round to 3 d.p. (~111 m).  Same parcel queried twice → instant return.
+    # No GIS work, no thread-pool, no ML inference.
     key = _cache_key(lat, lon, purpose)
     if key in _result_cache:
         return _result_cache[key]
 
-    # ── PERF 3: run_in_executor ──────────────────────────────────────
-    # _run_analysis() is 100 % synchronous (GeoPandas, Scikit-learn,
-    # Rasterio).  Calling it directly inside an `async def` blocks
-    # uvicorn's event loop — no other request can be served while GIS
-    # work is running.  run_in_executor offloads it to a thread-pool
-    # worker so the loop stays free.
+    # ── run_in_executor ───────────────────────────────────────────────────────
+    # _run_analysis() is 100% synchronous (GeoPandas, Scikit-learn, Rasterio).
+    # Calling it directly inside `async def` blocks uvicorn's event loop —
+    # no other request can be served while GIS work is running.
+    # run_in_executor() offloads it to a thread-pool worker so the loop stays
+    # free and concurrent requests are handled normally.
     loop   = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, partial(_run_analysis, lat, lon, purpose))
 
-    # Store in cache; evict oldest entry when full
+    # FIFO eviction when cache is full
     if len(_result_cache) >= _CACHE_MAX:
         _result_cache.pop(next(iter(_result_cache)))
     _result_cache[key] = result
 
     return result
+
 
 if __name__ == "__main__":
     import uvicorn

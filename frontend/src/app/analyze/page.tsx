@@ -1,21 +1,25 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Info, Navigation, Share2, AlertTriangle, CheckCircle, ShieldAlert, Target, InfoIcon, Map as MapIcon } from "lucide-react";
+import {
+  MapPin, Info, Navigation, Share2, AlertTriangle,
+  CheckCircle, ShieldAlert, Target, InfoIcon, Map as MapIcon,
+} from "lucide-react";
 import dynamic from "next/dynamic";
 import { useDebounce } from "@/hooks/useDebounce";
 
 // ── PERF 3 (Frontend): Lazy-load the map ────────────────────────────────────
-// MapWrapper already disables SSR. Here we go one step further: the map
-// component isn't even imported at module-level. It's only loaded when the
-// user first clicks "Show Map", keeping the initial JS bundle smaller and
-// avoiding Leaflet's heavy initialisation during first paint.
+// MapWrapper already disables SSR.  Here we go one step further: the map
+// component is NOT imported at module-level.  It is only downloaded when the
+// user first clicks "Show Interactive Map", keeping the initial JS bundle
+// smaller and avoiding Leaflet's heavy initialisation during first paint.
+// The user sees a placeholder button instead of an invisible blocking load.
 const MapWrapper = dynamic(() => import("@/components/MapWrapper"), {
   ssr: false,
   loading: () => (
     <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm animate-pulse">
-      Loading map engine...
+      Loading map engine…
     </div>
   ),
 });
@@ -42,43 +46,96 @@ interface AnalysisResult {
 }
 
 // ── Progressive reveal phases ────────────────────────────────────────────────
-// The backend returns one JSON blob. We can't stream partial data, but we CAN
-// reveal the result in timed phases so the UI feels responsive rather than
-// "nothing → everything" instantly. Each phase unlocks after a short delay.
+// The backend returns one JSON blob, but we reveal the result in timed phases
+// so the UI feels responsive rather than showing "nothing → everything" at
+// once.  Each phase unlocks after a short delay once data arrives.
 type RevealPhase = "none" | "banner" | "explanation" | "metrics";
 
+// Loading steps shown while the API call is in-flight.
+// Each step becomes "active" after the previous one completes, giving the
+// user a sense of real progress without needing streaming from the server.
+const LOADING_STEPS = [
+  { label: "Querying GIS databases…",               duration: 900 },
+  { label: "Calculating distances to water bodies…", duration: 700 },
+  { label: "Running Random Forest classifier…",      duration: 500 },
+  { label: "Generating environmental insights…",     duration: 400 },
+];
+
 export default function AnalyzePage() {
-  const [lat, setLat] = useState<string>("");
-  const [lon, setLon] = useState<string>("");
+  const [lat, setLat]         = useState<string>("");
+  const [lon, setLon]         = useState<string>("");
   const [purpose, setPurpose] = useState<string>("General");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult]   = useState<AnalysisResult | null>(null);
+  const [error, setError]     = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [revealPhase, setRevealPhase] = useState<RevealPhase>("none");
 
+  // ── PERF 2 (Frontend): Progressive loading step tracker ──────────────────
+  // Tracks which step label is currently "active" in the loading animation.
+  // Steps advance on a timer so the UI always feels alive, even when the
+  // backend is simply doing its work silently.
+  const [activeStep, setActiveStep] = useState<number>(-1);
+
   // ── PERF 1 (Frontend): Debounce coordinate inputs ───────────────────────
-  // The raw lat/lon state updates on every keystroke (needed for controlled
-  // inputs), but debouncedLat/Lon only updates 400 ms after the user pauses.
-  // The map uses the debounced value so it doesn't re-center mid-type.
+  // The raw lat/lon state updates on every keystroke (required for controlled
+  // inputs), but debouncedLat/Lon only updates 400 ms AFTER the user pauses
+  // typing.  The Leaflet map uses the debounced value so it doesn't re-center
+  // on every character the user types.
   const debouncedLat = useDebounce(lat, 400);
   const debouncedLon = useDebounce(lon, 400);
 
-  // Progressive reveal: unlock phases with timed delays after data arrives
+  // ── AbortController ref ───────────────────────────────────────────────────
+  // Stores the AbortController for the current in-flight fetch so we can
+  // cancel it if the user submits a new request before the previous one
+  // finishes — prevents stale results from overwriting a newer analysis.
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Timers for the progressive reveal phases
   const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  const startReveal = () => {
-    // Clear any stale timers from a previous run
+  // Timers for the loading step advancement
+  const stepTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // ── Progressive reveal: unlock phases with timed delays ──────────────────
+  const startReveal = useCallback(() => {
     revealTimers.current.forEach(clearTimeout);
     setRevealPhase("banner");
     revealTimers.current = [
       setTimeout(() => setRevealPhase("explanation"), 300),
       setTimeout(() => setRevealPhase("metrics"),     600),
     ];
-  };
+  }, []);
 
-  // Clean up timers on unmount
-  useEffect(() => () => revealTimers.current.forEach(clearTimeout), []);
+  // ── Start the loading step progression ───────────────────────────────────
+  // Each step becomes active after the cumulative duration of all previous
+  // steps.  If the API responds faster than the total duration, the result
+  // still reveals correctly via startReveal().
+  const startLoadingSteps = useCallback(() => {
+    stepTimers.current.forEach(clearTimeout);
+    setActiveStep(0);
+    let cumulative = 0;
+    LOADING_STEPS.slice(1).forEach((step, i) => {
+      cumulative += LOADING_STEPS[i].duration;
+      stepTimers.current.push(
+        setTimeout(() => setActiveStep(i + 1), cumulative)
+      );
+    });
+  }, []);
+
+  const stopLoadingSteps = useCallback(() => {
+    stepTimers.current.forEach(clearTimeout);
+    setActiveStep(-1);
+  }, []);
+
+  // Clean up all timers on unmount
+  useEffect(
+    () => () => {
+      revealTimers.current.forEach(clearTimeout);
+      stepTimers.current.forEach(clearTimeout);
+    },
+    []
+  );
 
   const loadDemo = () => {
     setLat("17.3850");
@@ -91,6 +148,7 @@ export default function AnalyzePage() {
     setLon(newLon.toFixed(5));
   };
 
+  // ── Main analysis handler ──────────────────────────────────────────────────
   const analyzeLand = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!lat || !lon) {
@@ -98,10 +156,20 @@ export default function AnalyzePage() {
       return;
     }
 
+    // Cancel any previous in-flight request before starting a new one.
+    // This prevents a slow prior request from overwriting the result of a
+    // newer, faster request (race condition).
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError(null);
     setResult(null);
     setRevealPhase("none");
+    startLoadingSteps();
 
     try {
       const response = await fetch(
@@ -109,19 +177,33 @@ export default function AnalyzePage() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat: parseFloat(lat), lon: parseFloat(lon), purpose }),
+          body: JSON.stringify({
+            lat: parseFloat(lat),
+            lon: parseFloat(lon),
+            purpose,
+          }),
+          // ── PERF 1 (Frontend): AbortController ──────────────────────────
+          // Passing the signal links this fetch to our controller.  If the
+          // user submits again (or navigates away), the pending request is
+          // cancelled so we don't process a stale response.
+          signal: controller.signal,
         }
       );
 
       if (!response.ok) throw new Error("Failed to analyze location");
 
-      const data = await response.json();
+      const data: AnalysisResult = await response.json();
       setResult(data);
-      startReveal();        // kick off the staged reveal
+      startReveal(); // kick off the staged reveal
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred during analysis.");
+      // Ignore AbortError — it means we deliberately cancelled the request
+      if (err instanceof Error && err.name === "AbortError") return;
+      setError(
+        err instanceof Error ? err.message : "An error occurred during analysis."
+      );
     } finally {
       setLoading(false);
+      stopLoadingSteps();
     }
   };
 
@@ -129,8 +211,11 @@ export default function AnalyzePage() {
     if (!result) return;
     const shareText = `GeoSafe AI Land Analysis:\nRisk Level: ${result.risk}\nLocation: ${lat}, ${lon}\nAI Insight: ${result.explanation}`;
     if (navigator.share) {
-      try { await navigator.share({ title: "GeoSafe AI Land Analysis", text: shareText }); }
-      catch (err) { console.log("Error sharing:", err); }
+      try {
+        await navigator.share({ title: "GeoSafe AI Land Analysis", text: shareText });
+      } catch (err) {
+        console.log("Error sharing:", err);
+      }
     } else {
       navigator.clipboard.writeText(shareText);
       alert("Result copied to clipboard!");
@@ -143,8 +228,12 @@ export default function AnalyzePage() {
   return (
     <div className="min-h-screen pt-8 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">Analyze Land Safety</h1>
-        <p className="text-gray-400">Select a location to run instant AI spatial analysis.</p>
+        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+          Analyze Land Safety
+        </h1>
+        <p className="text-gray-400">
+          Select a location to run instant AI spatial analysis.
+        </p>
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8">
@@ -159,32 +248,49 @@ export default function AnalyzePage() {
                   <div className="group relative">
                     <Info className="w-4 h-4 text-gray-400 cursor-help" />
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-xs text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                      Latitude (N/S) and Longitude (E/W) pinpoint exact locations on Earth. Click on the map to autofill.
+                      Latitude (N/S) and Longitude (E/W) pinpoint exact
+                      locations on Earth. Click on the map to autofill.
                     </div>
                   </div>
                 </label>
-                <button type="button" onClick={loadDemo} className="text-xs text-primary hover:underline flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={loadDemo}
+                  className="text-xs text-primary hover:underline flex items-center gap-1"
+                >
                   <Navigation className="w-3 h-3" /> Try Demo Location
                 </button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <input
-                  type="number" step="any" placeholder="Latitude"
-                  value={lat} onChange={(e) => setLat(e.target.value)}
+                  id="lat-input"
+                  type="number"
+                  step="any"
+                  placeholder="Latitude"
+                  value={lat}
+                  onChange={(e) => setLat(e.target.value)}
                   className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                 />
                 <input
-                  type="number" step="any" placeholder="Longitude"
-                  value={lon} onChange={(e) => setLon(e.target.value)}
+                  id="lon-input"
+                  type="number"
+                  step="any"
+                  placeholder="Longitude"
+                  value={lon}
+                  onChange={(e) => setLon(e.target.value)}
                   className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                 />
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-white mb-2 block">Intended Purpose</label>
+                <label className="text-sm font-semibold text-white mb-2 block">
+                  Intended Purpose
+                </label>
                 <select
-                  value={purpose} onChange={(e) => setPurpose(e.target.value)}
+                  id="purpose-select"
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
                   className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all appearance-none"
                 >
                   <option value="General">General Analysis</option>
@@ -195,13 +301,15 @@ export default function AnalyzePage() {
               </div>
 
               <button
-                type="submit" disabled={loading}
+                id="analyze-btn"
+                type="submit"
+                disabled={loading}
                 className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.5)]"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-geo-spin inline-block" />
-                    Processing AI Analysis...
+                    Processing AI Analysis…
                   </span>
                 ) : (
                   <><MapPin className="w-5 h-5" /> Run Safety Scan</>
@@ -218,9 +326,16 @@ export default function AnalyzePage() {
           </div>
 
           {/* ── PERF 3: Deferred map — only mounts when the user asks for it ── */}
-          <div className="glass-panel overflow-hidden relative" style={{ minHeight: showMap ? "400px" : "auto" }}>
+          {/* WHY: Leaflet adds ~200 kB of JS to the bundle. By only mounting the  */}
+          {/* map when the user explicitly requests it, we keep the initial page   */}
+          {/* load fast and reduce Time-to-Interactive significantly.              */}
+          <div
+            className="glass-panel overflow-hidden relative"
+            style={{ minHeight: showMap ? "400px" : "auto" }}
+          >
             {!showMap ? (
               <button
+                id="show-map-btn"
                 onClick={() => setShowMap(true)}
                 className="w-full flex items-center justify-center gap-3 py-6 text-gray-400 hover:text-white hover:bg-white/5 transition-colors rounded-xl"
               >
@@ -258,14 +373,23 @@ export default function AnalyzePage() {
                 </div>
                 <h3 className="text-xl font-bold text-white mb-2">Awaiting Location</h3>
                 <p className="text-gray-400 max-w-sm">
-                  Enter coordinates or select a point on the map to generate a comprehensive land intelligence report.
+                  Enter coordinates or select a point on the map to generate a
+                  comprehensive land intelligence report.
                 </p>
               </motion.div>
             )}
 
-            {/* ── Loading Spinner ── */}
+            {/* ── PERF 2 (Frontend): Progressive loading stepper ─────────────────
+                WHY: The backend processes GIS data synchronously and returns one
+                JSON blob — we cannot stream partial results.  However we CAN give
+                the user a sense of real progress by advancing labelled steps on a
+                timer that mirrors typical backend timing.  This turns the blank
+                "loading…" wait into an informative sequence and reduces perceived
+                latency significantly.
+            ──────────────────────────────────────────────────────────────────── */}
             {loading && (
               <motion.div
+                key="loading"
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="h-full min-h-[400px] glass-panel flex flex-col items-center justify-center p-8"
               >
@@ -279,35 +403,59 @@ export default function AnalyzePage() {
                   <Target className="w-7 h-7 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                 </div>
 
-                <h3 className="text-xl font-bold text-white mb-5 animate-fade-in-up">AI Analyzing Terrain...</h3>
+                <h3 className="text-xl font-bold text-white mb-5 animate-fade-in-up">
+                  AI Analyzing Terrain…
+                </h3>
 
-                {/* Staggered processing steps */}
+                {/* ── Timed step progression ──
+                    Each step fades in at the correct cumulative offset and
+                    shows a pulsing dot while active, a filled dot when done. */}
                 <div className="space-y-3 w-full max-w-xs">
-                  {[
-                    "Querying GIS databases...",
-                    "Calculating spatial distances to water...",
-                    "Running Random Forest classifier...",
-                    "Generating environmental insights...",
-                  ].map((step, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 text-sm text-gray-400 animate-step-fade-in"
-                      style={{ animationDelay: `${i * 0.15}s` }}
-                    >
-                      <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
-                        <div
-                          className="w-2 h-2 bg-primary rounded-full animate-dot-pulse"
-                          style={{ animationDelay: `${i * 0.2}s` }}
-                        />
+                  {LOADING_STEPS.map((step, i) => {
+                    const isDone   = activeStep > i;
+                    const isActive = activeStep === i;
+                    const isPending = activeStep < i;
+
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-3 text-sm transition-all duration-500 ${
+                          isPending ? "opacity-30" : "opacity-100"
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
+                          isDone
+                            ? "bg-primary/80"
+                            : isActive
+                              ? "bg-primary/20"
+                              : "bg-white/10"
+                        }`}>
+                          {isDone ? (
+                            <CheckCircle className="w-3 h-3 text-white" />
+                          ) : isActive ? (
+                            <div className="w-2 h-2 bg-primary rounded-full animate-dot-pulse" />
+                          ) : (
+                            <div className="w-2 h-2 bg-white/20 rounded-full" />
+                          )}
+                        </div>
+                        <span className={isDone ? "text-gray-300 line-through" : isActive ? "text-white" : "text-gray-500"}>
+                          {step.label}
+                        </span>
                       </div>
-                      {step}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </motion.div>
             )}
 
-            {/* ── PERF 2 (Frontend): Progressive staged reveal ── */}
+            {/* ── PERF 2 (Frontend): Progressive staged reveal ─────────────────
+                Phase 1 (banner)      → appears immediately on data arrival
+                Phase 2 (explanation) → fades in 300 ms later
+                Phase 3 (metrics)     → fades in 600 ms later (staggered cards)
+
+                This three-phase reveal mimics streaming even though we receive
+                a single JSON response, giving the UI a "building up" feel.
+            ──────────────────────────────────────────────────────────────────── */}
             {result && !loading && (
               <motion.div
                 key="results"
@@ -319,27 +467,33 @@ export default function AnalyzePage() {
                 {revealPhase !== "none" && (
                   <div
                     className={`glass-panel p-6 flex flex-col sm:flex-row items-center justify-between border-l-4 transition-shadow duration-500 animate-fade-in-up ${
-                      result.risk === "High"   ? "border-l-high   bg-high/5   animate-pulse-danger"  :
-                      result.risk === "Medium" ? "border-l-medium bg-medium/5 animate-glow-medium"   :
-                                                 "border-l-safe   bg-safe/5   animate-glow-safe"
+                      result.risk === "High"
+                        ? "border-l-high   bg-high/5   animate-pulse-danger"
+                        : result.risk === "Medium"
+                          ? "border-l-medium bg-medium/5 animate-glow-medium"
+                          : "border-l-safe   bg-safe/5   animate-glow-safe"
                     }`}
                   >
                     <div className="flex items-center gap-4 mb-4 sm:mb-0">
                       <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                        result.risk === "High"   ? "bg-high/20   text-high"   :
-                        result.risk === "Medium" ? "bg-medium/20 text-medium" :
-                                                   "bg-safe/20   text-safe"
+                        result.risk === "High"
+                          ? "bg-high/20   text-high"
+                          : result.risk === "Medium"
+                            ? "bg-medium/20 text-medium"
+                            : "bg-safe/20   text-safe"
                       }`}>
-                        {result.risk === "High"   ? <ShieldAlert className="w-7 h-7" />   :
+                        {result.risk === "High"   ? <ShieldAlert   className="w-7 h-7" /> :
                          result.risk === "Medium" ? <AlertTriangle className="w-7 h-7" /> :
-                                                    <CheckCircle className="w-7 h-7" />}
+                                                    <CheckCircle   className="w-7 h-7" />}
                       </div>
                       <div>
                         <p className="text-sm text-gray-400 font-medium">AI Risk Assessment</p>
                         <h2 className={`text-3xl font-black ${
                           result.risk === "High"   ? "text-high"   :
                           result.risk === "Medium" ? "text-medium" : "text-safe"
-                        }`}>{result.risk} Risk</h2>
+                        }`}>
+                          {result.risk} Risk
+                        </h2>
                       </div>
                     </div>
                     <button
@@ -363,19 +517,21 @@ export default function AnalyzePage() {
                     <h3 className="font-bold text-white mb-2 flex items-center gap-2">
                       <Info className="w-5 h-5 text-primary" /> What does this mean for me?
                     </h3>
-                    <p className="text-gray-300 leading-relaxed relative z-10">{result.explanation}</p>
+                    <p className="text-gray-300 leading-relaxed relative z-10">
+                      {result.explanation}
+                    </p>
                   </div>
                 )}
 
                 {/* Phase 3 — Metric Cards (appears after 600 ms, staggered) */}
                 {revealPhase === "metrics" && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    <MetricCard title="Land Type"       value={result.land_type}                                        index={0} />
-                    <MetricCard title="Terrain"         value={result.terrain}                                          index={1} />
-                    <MetricCard title="Elevation"       value={`${result.elevation}m`}                                  index={2} />
+                    <MetricCard title="Land Type"        value={result.land_type}                                          index={0} />
+                    <MetricCard title="Terrain"          value={result.terrain}                                             index={1} />
+                    <MetricCard title="Elevation"        value={`${result.elevation}m`}                                     index={2} />
                     <MetricCard title="Gov. Restricted?" value={result.gov_land ? `Yes (${result.gov_type})` : "No"}  alert={result.gov_land} index={3} />
-                    <MetricCard title="On Public Road?" value={result.on_road ? "Yes" : "No"}                          alert={result.on_road}  index={4} />
-                    <MetricCard title="Surroundings"    value={`${result.res_pct}% Res.`} sub={`${result.ind_pct}% Ind.`}                      index={5} />
+                    <MetricCard title="On Public Road?"  value={result.on_road ? "Yes" : "No"}                         alert={result.on_road}  index={4} />
+                    <MetricCard title="Surroundings"     value={`${result.res_pct}% Res.`} sub={`${result.ind_pct}% Ind.`}                      index={5} />
                   </div>
                 )}
               </motion.div>
@@ -387,18 +543,27 @@ export default function AnalyzePage() {
   );
 }
 
+// ── Metric card sub-component ────────────────────────────────────────────────
 function MetricCard({
   title, value, sub, alert, index = 0,
 }: {
-  title: string; value: string | number; sub?: string; alert?: boolean; index?: number;
+  title: string;
+  value: string | number;
+  sub?: string;
+  alert?: boolean;
+  index?: number;
 }) {
   return (
     <div
-      className={`glass-panel p-4 animate-slide-in-up hover:bg-white/[0.04] transition-colors ${alert ? "border-red-500/50 bg-red-500/5" : ""}`}
+      className={`glass-panel p-4 animate-slide-in-up hover:bg-white/[0.04] transition-colors ${
+        alert ? "border-red-500/50 bg-red-500/5" : ""
+      }`}
       style={{ animationDelay: `${0.05 + index * 0.07}s` }}
     >
       <div className="text-xs text-gray-400 mb-1">{title}</div>
-      <div className={`font-bold text-lg ${alert ? "text-red-400" : "text-white"}`}>{value}</div>
+      <div className={`font-bold text-lg ${alert ? "text-red-400" : "text-white"}`}>
+        {value}
+      </div>
       {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
     </div>
   );
