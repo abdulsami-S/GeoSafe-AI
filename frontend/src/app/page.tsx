@@ -2,34 +2,68 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowRight, Map, Droplets, TreePine, AlertTriangle, CheckCircle2, Factory, Home as HomeIcon, Tractor, Building } from "lucide-react";
+import {
+  ArrowRight, Map, Droplets, TreePine, AlertTriangle,
+  CheckCircle2, Factory, Home as HomeIcon, Tractor, Building,
+} from "lucide-react";
 
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/screenshots/background.jpg')] bg-cover bg-center opacity-10" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
-        
+
+      {/* ── Hero Section ──────────────────────────────────────────────────────
+          FIX: Removed bg-[url('/screenshots/background.jpg')] which caused a
+          404 and left the section invisible. Replaced with a pure-CSS animated
+          radial gradient that always renders regardless of static assets.     */}
+      <section className="relative pt-36 pb-24 overflow-hidden">
+        {/* Animated gradient background — no external file needed */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-950 via-background to-emerald-950 opacity-60" />
+        {/* Radial "glow" pulse centred behind the headline */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] rounded-full bg-primary/10 blur-3xl" />
+        {/* Grid dot overlay for depth */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle, rgb(var(--primary)) 1px, transparent 1px)",
+            backgroundSize: "36px 36px",
+          }}
+        />
+        {/* Bottom fade into page background */}
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.6 }}
           >
-            <h1 className="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 tracking-tight mb-6">
-              Know Your Land <br /> Before You Build
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              AI-Powered Geospatial Analysis
+            </div>
+
+            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
+              <span className="text-white">Know Your Land</span>
+              <br />
+              <span className="bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+                Before You Build
+              </span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-10">
-              Advanced spatial intelligence and machine learning to analyze land safety, environmental risks, and suitability in seconds.
+
+            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-10 leading-relaxed">
+              Advanced spatial intelligence and machine learning to analyze land
+              safety, environmental risks, and suitability in seconds.
             </p>
+
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/analyze"
-                className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-full text-lg font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.6)] hover:shadow-[0_0_30px_rgba(59,130,246,0.8)] flex items-center justify-center gap-2"
+                className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-full text-lg font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.6)] hover:shadow-[0_0_35px_rgba(59,130,246,0.85)] flex items-center justify-center gap-2 group"
               >
-                Analyze Your Land Now <ArrowRight className="w-5 h-5" />
+                Analyze Your Land Now
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
                 href="/how-it-works"
@@ -47,10 +81,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { label: "AI Accuracy", value: "90%+" },
-              { label: "Risk Levels", value: "3" },
-              { label: "GIS Layers", value: "10+" },
-              { label: "Analysis Time", value: "< 2s" },
+              { label: "AI Accuracy",    value: "90%+" },
+              { label: "Risk Levels",    value: "3"    },
+              { label: "GIS Layers",     value: "10+"  },
+              { label: "Analysis Time",  value: "< 2s" },
             ].map((stat, i) => (
               <motion.div
                 key={i}
@@ -60,28 +94,33 @@ export default function Home() {
                 transition={{ delay: i * 0.1 }}
               >
                 <div className="text-4xl font-black text-white mb-2">{stat.value}</div>
-                <div className="text-sm text-gray-400 font-medium uppercase tracking-wider">{stat.label}</div>
+                <div className="text-sm text-gray-400 font-medium uppercase tracking-wider">
+                  {stat.label}
+                </div>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* How It Works - 3 Steps */}
-      <section className="py-24 relative">
+      {/* How It Works — 3 Steps */}
+      <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Simple, Powerful Process</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto">Non-technical? No problem. Get enterprise-grade spatial analysis in three simple steps.</p>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              Non-technical? No problem. Get enterprise-grade spatial analysis in three simple steps.
+            </p>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-8 relative">
-            <div className="hidden md:block absolute top-1/2 left-[16%] right-[16%] h-0.5 bg-gradient-to-r from-primary/0 via-primary/50 to-primary/0 -translate-y-1/2 z-0" />
-            
+            {/* Connecting line — positioned carefully so it doesn't overlay cards */}
+            <div className="hidden md:block absolute top-[56px] left-[calc(16%+32px)] right-[calc(16%+32px)] h-0.5 bg-gradient-to-r from-primary/0 via-primary/50 to-primary/0 z-0 pointer-events-none" />
+
             {[
-              { icon: Map, title: "1. Select Location", desc: "Drop a pin on the map or enter coordinates." },
-              { icon: CheckCircle2, title: "2. AI Analysis", desc: "Our engine processes 10+ GIS layers instantly." },
-              { icon: AlertTriangle, title: "3. Get Results", desc: "Receive simple, actionable land intelligence." }
+              { icon: Map,          title: "1. Select Location", desc: "Drop a pin on the map or enter coordinates." },
+              { icon: CheckCircle2, title: "2. AI Analysis",     desc: "Our engine processes 10+ GIS layers instantly." },
+              { icon: AlertTriangle, title: "3. Get Results",    desc: "Receive simple, actionable land intelligence." },
             ].map((step, i) => (
               <motion.div
                 key={i}
@@ -108,17 +147,24 @@ export default function Home() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Comprehensive Features</h2>
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { icon: Droplets, title: "Water Detection", desc: "Identifies nearby rivers, lakes, and oceans." },
-              { icon: TreePine, title: "Forest Awareness", desc: "Checks proximity to protected forest zones." },
-              { icon: Factory, title: "Surrounding Analysis", desc: "Calculates % of nearby industrial/residential zones." },
-              { icon: AlertTriangle, title: "Risk Score", desc: "Machine learning classification (Low/Medium/High)." },
-              { icon: HomeIcon, title: "Infrastructure", desc: "Detects proximity to roads and buildings." },
-              { icon: CheckCircle2, title: "Plain English Insights", desc: "AI explains the results so anyone can understand." }
+              { icon: Droplets,     title: "Water Detection",       desc: "Identifies nearby rivers, lakes, and oceans." },
+              { icon: TreePine,     title: "Forest Awareness",      desc: "Checks proximity to protected forest zones." },
+              { icon: Factory,      title: "Surrounding Analysis",  desc: "Calculates % of nearby industrial/residential zones." },
+              { icon: AlertTriangle,title: "Risk Score",            desc: "Machine learning classification (Low/Medium/High)." },
+              { icon: HomeIcon,     title: "Infrastructure",        desc: "Detects proximity to roads and buildings." },
+              { icon: CheckCircle2, title: "Plain English Insights",desc: "AI explains results so anyone can understand." },
             ].map((feature, i) => (
-              <div key={i} className="glass-panel p-6 flex gap-4 hover:bg-white/5 transition-colors">
+              <motion.div
+                key={i}
+                className="glass-panel p-6 flex gap-4 hover:bg-white/5 transition-colors"
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }}
+              >
                 <div className="shrink-0 mt-1">
                   <feature.icon className="w-6 h-6 text-primary" />
                 </div>
@@ -126,7 +172,7 @@ export default function Home() {
                   <h3 className="font-bold text-white text-lg mb-2">{feature.title}</h3>
                   <p className="text-gray-400 text-sm leading-relaxed">{feature.desc}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -138,21 +184,25 @@ export default function Home() {
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Who Is This For?</h2>
           </div>
-          
+
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { icon: HomeIcon, title: "Urban Planners", desc: "Ensure new developments are safe and compliant." },
-              { icon: Tractor, title: "Farmers", desc: "Find safe, suitable land for agriculture." },
-              { icon: Building, title: "Investors", desc: "Assess risk before buying commercial real estate." },
-              { icon: AlertTriangle, title: "Government", desc: "Monitor encroachments in restricted zones." }
+              { icon: HomeIcon,     title: "Urban Planners", desc: "Ensure new developments are safe and compliant." },
+              { icon: Tractor,      title: "Farmers",        desc: "Find safe, suitable land for agriculture." },
+              { icon: Building,     title: "Investors",      desc: "Assess risk before buying commercial real estate." },
+              { icon: AlertTriangle,title: "Government",     desc: "Monitor encroachments in restricted zones." },
             ].map((useCase, i) => (
               <motion.div
                 key={i}
                 className="glass-panel p-6 border-t-4"
-                style={{ borderTopColor: "var(--primary)" }}
+                style={{ borderTopColor: "rgb(var(--primary))" }}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
                 whileHover={{ y: -5 }}
               >
-                <useCase.icon className="w-10 h-10 text-white mb-4" />
+                <useCase.icon className="w-10 h-10 text-primary mb-4" />
                 <h3 className="text-xl font-bold text-white mb-2">{useCase.title}</h3>
                 <p className="text-gray-400 text-sm">{useCase.desc}</p>
               </motion.div>

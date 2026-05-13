@@ -67,6 +67,20 @@
 }
 
 /* ============================================
+   Select / dropdown dark theme override
+   className on <option> is ignored by browsers
+   for the native popup — only global CSS works.
+   ============================================ */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: rgb(17 24 39); /* gray-900 */
+  color: white;
+}
+
+/* ============================================
    ANIMATION KEYFRAMES
    ============================================
    All animations referenced by Tailwind's

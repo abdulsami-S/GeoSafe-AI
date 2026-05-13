@@ -12,7 +12,9 @@ export default function HowItWorksPage() {
         <p className="text-xl text-gray-400">From a simple map click to advanced spatial intelligence.</p>
       </div>
 
-      <div className="space-y-12 relative before:absolute before:inset-0 before:ml-[28px] md:before:mx-auto md:before:translate-x-0 before:h-full before:w-1 before:bg-gradient-to-b before:from-primary/50 before:to-transparent z-0">
+      <div className="space-y-12 relative">
+        {/* Vertical timeline line — simple left-border, no overlay */}
+        <div className="absolute left-7 top-0 bottom-0 w-px bg-gradient-to-b from-primary/50 to-transparent md:hidden" />
         
         <Step 
           number={1} 

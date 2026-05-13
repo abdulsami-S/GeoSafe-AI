@@ -287,17 +287,29 @@ export default function AnalyzePage() {
                 <label className="text-sm font-semibold text-white mb-2 block">
                   Intended Purpose
                 </label>
-                <select
-                  id="purpose-select"
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all appearance-none"
-                >
-                  <option value="General">General Analysis</option>
-                  <option value="Residential">Residential (Housing)</option>
-                  <option value="Industrial">Industrial (Factories)</option>
-                  <option value="Farming">Farming (Agriculture)</option>
-                </select>
+                {/* Custom-styled select — overrides browser default grey/white appearance.
+                    The wrapper div provides a positioned custom SVG arrow since
+                    appearance-none removes the native one. */}
+                <div className="relative">
+                  <select
+                    id="purpose-select"
+                    value={purpose}
+                    onChange={(e) => setPurpose(e.target.value)}
+                    className="w-full bg-card/80 border border-white/10 rounded-lg px-4 py-2.5 pr-10 text-white focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer hover:border-white/20"
+                    style={{ colorScheme: "dark" }}
+                  >
+                    <option value="General"     className="bg-gray-900 text-white">General Analysis</option>
+                    <option value="Residential" className="bg-gray-900 text-white">Residential (Housing)</option>
+                    <option value="Industrial"  className="bg-gray-900 text-white">Industrial (Factories)</option>
+                    <option value="Farming"     className="bg-gray-900 text-white">Farming (Agriculture)</option>
+                  </select>
+                  {/* Custom chevron arrow */}
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
 
               <button

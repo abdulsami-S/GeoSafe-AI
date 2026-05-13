@@ -68,20 +68,25 @@ export default function AboutPage() {
         </h2>
         
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {["Abdul Sami", "Thrivikram", "Leela Yashwanth", "Mohammad Samiullah"].map((name, i) => (
-            <motion.div 
-              key={name}
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="glass-panel p-6 text-center"
+          {[
+            { name: "Abdul Sami",        role: "Lead Developer"     },
+            { name: "Thrivikram",         role: "GIS Engineer"       },
+            { name: "Leela Yashwanth",    role: "ML Engineer"        },
+            { name: "Mohammad Samiullah", role: "Backend Developer"  },
+          ].map((member, i) => (
+            <motion.div
+              key={member.name}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false, amount: 0 }}
+              transition={{ delay: i * 0.1, duration: 0.4 }}
+              className="glass-panel p-6 text-center hover:bg-white/5 transition-colors"
             >
               <div className="w-20 h-20 bg-gradient-to-br from-primary/40 to-primary/10 rounded-full mx-auto mb-4 border-2 border-primary/30 flex items-center justify-center">
-                <span className="text-2xl font-bold text-white">{name.charAt(0)}</span>
+                <span className="text-2xl font-bold text-white">{member.name.charAt(0)}</span>
               </div>
-              <h3 className="text-lg font-bold text-white">{name}</h3>
-              <p className="text-sm text-primary">Core Contributor</p>
+              <h3 className="text-lg font-bold text-white">{member.name}</h3>
+              <p className="text-sm text-primary mt-1">{member.role}</p>
             </motion.div>
           ))}
         </div>
