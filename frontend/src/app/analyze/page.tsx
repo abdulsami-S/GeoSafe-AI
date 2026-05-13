@@ -1,9 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, Info, Navigation, Share2, AlertTriangle, CheckCircle, ShieldAlert, Target, Loader2, InfoIcon } from "lucide-react";
-import MapWrapper from "@/components/MapWrapper";
+import { MapPin, Info, Navigation, Share2, AlertTriangle, CheckCircle, ShieldAlert, Target, InfoIcon, Map as MapIcon } from "lucide-react";
+import dynamic from "next/dynamic";
+import { useDebounce } from "@/hooks/useDebounce";
+
+// ── PERF 3 (Frontend): Lazy-load the map ────────────────────────────────────
+// MapWrapper already disables SSR. Here we go one step further: the map
+// component isn't even imported at module-level. It's only loaded when the
+// user first clicks "Show Map", keeping the initial JS bundle smaller and
+// avoiding Leaflet's heavy initialisation during first paint.
+const MapWrapper = dynamic(() => import("@/components/MapWrapper"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm animate-pulse">
+      Loading map engine...
+    </div>
+  ),
+});
 
 interface AnalysisResult {
   risk: "Low" | "Medium" | "High";
@@ -26,6 +41,12 @@ interface AnalysisResult {
   explanation: string;
 }
 
+// ── Progressive reveal phases ────────────────────────────────────────────────
+// The backend returns one JSON blob. We can't stream partial data, but we CAN
+// reveal the result in timed phases so the UI feels responsive rather than
+// "nothing → everything" instantly. Each phase unlocks after a short delay.
+type RevealPhase = "none" | "banner" | "explanation" | "metrics";
+
 export default function AnalyzePage() {
   const [lat, setLat] = useState<string>("");
   const [lon, setLon] = useState<string>("");
@@ -33,8 +54,32 @@ export default function AnalyzePage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const [revealPhase, setRevealPhase] = useState<RevealPhase>("none");
 
-  // Demo Location: Hyderabad, India
+  // ── PERF 1 (Frontend): Debounce coordinate inputs ───────────────────────
+  // The raw lat/lon state updates on every keystroke (needed for controlled
+  // inputs), but debouncedLat/Lon only updates 400 ms after the user pauses.
+  // The map uses the debounced value so it doesn't re-center mid-type.
+  const debouncedLat = useDebounce(lat, 400);
+  const debouncedLon = useDebounce(lon, 400);
+
+  // Progressive reveal: unlock phases with timed delays after data arrives
+  const revealTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const startReveal = () => {
+    // Clear any stale timers from a previous run
+    revealTimers.current.forEach(clearTimeout);
+    setRevealPhase("banner");
+    revealTimers.current = [
+      setTimeout(() => setRevealPhase("explanation"), 300),
+      setTimeout(() => setRevealPhase("metrics"),     600),
+    ];
+  };
+
+  // Clean up timers on unmount
+  useEffect(() => () => revealTimers.current.forEach(clearTimeout), []);
+
   const loadDemo = () => {
     setLat("17.3850");
     setLon("78.4867");
@@ -56,21 +101,24 @@ export default function AnalyzePage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setRevealPhase("none");
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/check`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lat: parseFloat(lat), lon: parseFloat(lon), purpose }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/check`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: parseFloat(lat), lon: parseFloat(lon), purpose }),
+        }
+      );
 
       if (!response.ok) throw new Error("Failed to analyze location");
-      
+
       const data = await response.json();
       setResult(data);
+      startReveal();        // kick off the staged reveal
     } catch (err: unknown) {
-      // BUG 10 FIX: `catch (err: any)` disables type checking on err.
-      // Use `unknown` and narrow with instanceof to access .message safely.
       setError(err instanceof Error ? err.message : "An error occurred during analysis.");
     } finally {
       setLoading(false);
@@ -79,23 +127,18 @@ export default function AnalyzePage() {
 
   const shareResult = async () => {
     if (!result) return;
-    
     const shareText = `GeoSafe AI Land Analysis:\nRisk Level: ${result.risk}\nLocation: ${lat}, ${lon}\nAI Insight: ${result.explanation}`;
-    
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'GeoSafe AI Land Analysis',
-          text: shareText,
-        });
-      } catch (err) {
-        console.log("Error sharing:", err);
-      }
+      try { await navigator.share({ title: "GeoSafe AI Land Analysis", text: shareText }); }
+      catch (err) { console.log("Error sharing:", err); }
     } else {
       navigator.clipboard.writeText(shareText);
       alert("Result copied to clipboard!");
     }
   };
+
+  const mapLat = parseFloat(debouncedLat) || 20;
+  const mapLon = parseFloat(debouncedLon) || 0;
 
   return (
     <div className="min-h-screen pt-8 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -105,8 +148,8 @@ export default function AnalyzePage() {
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8">
-        
-        {/* Left Column: Form & Map */}
+
+        {/* Left Column: Form + Map */}
         <div className="lg:col-span-5 space-y-6">
           <div className="glass-panel p-6">
             <form onSubmit={analyzeLand} className="space-y-4">
@@ -124,35 +167,24 @@ export default function AnalyzePage() {
                   <Navigation className="w-3 h-3" /> Try Demo Location
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="Latitude"
-                    value={lat}
-                    onChange={(e) => setLat(e.target.value)}
-                    className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder="Longitude"
-                    value={lon}
-                    onChange={(e) => setLon(e.target.value)}
-                    className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-                  />
-                </div>
+                <input
+                  type="number" step="any" placeholder="Latitude"
+                  value={lat} onChange={(e) => setLat(e.target.value)}
+                  className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                />
+                <input
+                  type="number" step="any" placeholder="Longitude"
+                  value={lon} onChange={(e) => setLon(e.target.value)}
+                  className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                />
               </div>
 
               <div>
                 <label className="text-sm font-semibold text-white mb-2 block">Intended Purpose</label>
                 <select
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
+                  value={purpose} onChange={(e) => setPurpose(e.target.value)}
                   className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all appearance-none"
                 >
                   <option value="General">General Analysis</option>
@@ -163,23 +195,21 @@ export default function AnalyzePage() {
               </div>
 
               <button
-                type="submit"
-                disabled={loading}
+                type="submit" disabled={loading}
                 className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.5)]"
               >
                 {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" /> Processing AI Analysis...
-                  </>
+                  <span className="flex items-center gap-2">
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-geo-spin inline-block" />
+                    Processing AI Analysis...
+                  </span>
                 ) : (
-                  <>
-                    <MapPin className="w-5 h-5" /> Run Safety Scan
-                  </>
+                  <><MapPin className="w-5 h-5" /> Run Safety Scan</>
                 )}
               </button>
-              
+
               {error && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex gap-2 items-start">
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm flex gap-2 items-start animate-fade-in-up">
                   <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
                   <p>{error}</p>
                 </div>
@@ -187,27 +217,40 @@ export default function AnalyzePage() {
             </form>
           </div>
 
-          <div className="glass-panel overflow-hidden h-[400px] relative">
-            <MapWrapper 
-              lat={parseFloat(lat) || 20} 
-              lon={parseFloat(lon) || 0} 
-              onLocationSelect={handleMapSelect}
-              riskLevel={result?.risk}
-            />
-            <div className="absolute top-4 left-4 z-[400] bg-black/60 backdrop-blur text-white text-xs px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
-              <InfoIcon className="w-3 h-3 text-primary" /> Click map to select location
-            </div>
+          {/* ── PERF 3: Deferred map — only mounts when the user asks for it ── */}
+          <div className="glass-panel overflow-hidden relative" style={{ minHeight: showMap ? "400px" : "auto" }}>
+            {!showMap ? (
+              <button
+                onClick={() => setShowMap(true)}
+                className="w-full flex items-center justify-center gap-3 py-6 text-gray-400 hover:text-white hover:bg-white/5 transition-colors rounded-xl"
+              >
+                <MapIcon className="w-5 h-5 text-primary" />
+                <span className="text-sm font-medium">Show Interactive Map</span>
+              </button>
+            ) : (
+              <div className="h-[400px] relative animate-fade-in-up">
+                <MapWrapper
+                  lat={mapLat}
+                  lon={mapLon}
+                  onLocationSelect={handleMapSelect}
+                  riskLevel={result?.risk}
+                />
+                <div className="absolute top-4 left-4 z-[400] bg-black/60 backdrop-blur text-white text-xs px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
+                  <InfoIcon className="w-3 h-3 text-primary" /> Click map to select location
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Right Column: Results Dashboard */}
         <div className="lg:col-span-7">
           <AnimatePresence mode="wait">
+
+            {/* Empty state */}
             {!result && !loading && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="h-full min-h-[400px] glass-panel flex flex-col items-center justify-center text-center p-8 border-dashed"
               >
                 <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-6 border border-primary/20">
@@ -220,32 +263,41 @@ export default function AnalyzePage() {
               </motion.div>
             )}
 
+            {/* ── Loading Spinner ── */}
             {loading && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="h-full min-h-[400px] glass-panel flex flex-col items-center justify-center p-8"
               >
-                <div className="relative w-24 h-24 mb-8">
-                  <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
-                  <div className="absolute inset-0 border-4 border-primary rounded-full border-t-transparent animate-spin"></div>
-                  <Target className="w-8 h-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                {/* Dual-ring orbital spinner */}
+                <div className="relative w-28 h-28 mb-8">
+                  <div className="absolute inset-0 border-[3px] border-primary/15 rounded-full" />
+                  <div className="absolute inset-0 border-[3px] border-transparent border-t-primary border-r-primary rounded-full animate-geo-spin" />
+                  <div className="absolute inset-3 border-[3px] border-primary/10 rounded-full" />
+                  <div className="absolute inset-3 border-[3px] border-transparent border-b-primary/70 border-l-primary/70 rounded-full animate-geo-spin-reverse" />
+                  <div className="absolute top-1/2 left-1/2 w-8 h-8 rounded-full bg-primary/15 animate-scanner-ping" />
+                  <Target className="w-7 h-7 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                 </div>
-                <h3 className="text-xl font-bold text-white mb-4">AI Analyzing Terrain...</h3>
+
+                <h3 className="text-xl font-bold text-white mb-5 animate-fade-in-up">AI Analyzing Terrain...</h3>
+
+                {/* Staggered processing steps */}
                 <div className="space-y-3 w-full max-w-xs">
                   {[
                     "Querying GIS databases...",
-                    "Calculating spatial distance to water...",
+                    "Calculating spatial distances to water...",
                     "Running Random Forest classifier...",
-                    "Generating environmental insights..."
+                    "Generating environmental insights...",
                   ].map((step, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm text-gray-400">
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 text-sm text-gray-400 animate-step-fade-in"
+                      style={{ animationDelay: `${i * 0.15}s` }}
+                    >
                       <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center">
-                        <motion.div 
-                          className="w-2 h-2 bg-primary rounded-full"
-                          animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
-                          transition={{ repeat: Infinity, duration: 1.5, delay: i * 0.2 }}
+                        <div
+                          className="w-2 h-2 bg-primary rounded-full animate-dot-pulse"
+                          style={{ animationDelay: `${i * 0.2}s` }}
                         />
                       </div>
                       {step}
@@ -255,64 +307,77 @@ export default function AnalyzePage() {
               </motion.div>
             )}
 
+            {/* ── PERF 2 (Frontend): Progressive staged reveal ── */}
             {result && !loading && (
               <motion.div
+                key="results"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
-                {/* Risk Banner */}
-                <div className={`glass-panel p-6 flex flex-col sm:flex-row items-center justify-between border-l-4 ${
-                  result.risk === 'High' ? 'border-l-high bg-high/5' : 
-                  result.risk === 'Medium' ? 'border-l-medium bg-medium/5' : 
-                  'border-l-safe bg-safe/5'
-                }`}>
-                  <div className="flex items-center gap-4 mb-4 sm:mb-0">
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                      result.risk === 'High' ? 'bg-high/20 text-high' : 
-                      result.risk === 'Medium' ? 'bg-medium/20 text-medium' : 
-                      'bg-safe/20 text-safe'
-                    }`}>
-                      {result.risk === 'High' ? <ShieldAlert className="w-7 h-7" /> : 
-                       result.risk === 'Medium' ? <AlertTriangle className="w-7 h-7" /> : 
-                       <CheckCircle className="w-7 h-7" />}
+                {/* Phase 1 — Risk Banner (appears immediately) */}
+                {revealPhase !== "none" && (
+                  <div
+                    className={`glass-panel p-6 flex flex-col sm:flex-row items-center justify-between border-l-4 transition-shadow duration-500 animate-fade-in-up ${
+                      result.risk === "High"   ? "border-l-high   bg-high/5   animate-pulse-danger"  :
+                      result.risk === "Medium" ? "border-l-medium bg-medium/5 animate-glow-medium"   :
+                                                 "border-l-safe   bg-safe/5   animate-glow-safe"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4 mb-4 sm:mb-0">
+                      <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                        result.risk === "High"   ? "bg-high/20   text-high"   :
+                        result.risk === "Medium" ? "bg-medium/20 text-medium" :
+                                                   "bg-safe/20   text-safe"
+                      }`}>
+                        {result.risk === "High"   ? <ShieldAlert className="w-7 h-7" />   :
+                         result.risk === "Medium" ? <AlertTriangle className="w-7 h-7" /> :
+                                                    <CheckCircle className="w-7 h-7" />}
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-400 font-medium">AI Risk Assessment</p>
+                        <h2 className={`text-3xl font-black ${
+                          result.risk === "High"   ? "text-high"   :
+                          result.risk === "Medium" ? "text-medium" : "text-safe"
+                        }`}>{result.risk} Risk</h2>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-400 font-medium">AI Risk Assessment</p>
-                      <h2 className={`text-3xl font-black ${
-                        result.risk === 'High' ? 'text-high' : 
-                        result.risk === 'Medium' ? 'text-medium' : 
-                        'text-safe'
-                      }`}>{result.risk} Risk</h2>
+                    <button
+                      onClick={shareResult}
+                      className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors"
+                    >
+                      <Share2 className="w-4 h-4" /> Share Result
+                    </button>
+                  </div>
+                )}
+
+                {/* Phase 2 — AI Explanation Box (appears after 300 ms) */}
+                {(revealPhase === "explanation" || revealPhase === "metrics") && (
+                  <div
+                    className="glass-panel p-6 bg-primary/5 border-primary/20 relative overflow-hidden animate-slide-in-left"
+                    style={{ animationDelay: "0s" }}
+                  >
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                      <Target className="w-24 h-24 text-primary" />
                     </div>
+                    <h3 className="font-bold text-white mb-2 flex items-center gap-2">
+                      <Info className="w-5 h-5 text-primary" /> What does this mean for me?
+                    </h3>
+                    <p className="text-gray-300 leading-relaxed relative z-10">{result.explanation}</p>
                   </div>
-                  <button onClick={shareResult} className="bg-white/5 hover:bg-white/10 text-white border border-white/10 px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors">
-                    <Share2 className="w-4 h-4" /> Share Result
-                  </button>
-                </div>
+                )}
 
-                {/* AI Explanation Box */}
-                <div className="glass-panel p-6 bg-primary/5 border-primary/20 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <Target className="w-24 h-24 text-primary" />
+                {/* Phase 3 — Metric Cards (appears after 600 ms, staggered) */}
+                {revealPhase === "metrics" && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <MetricCard title="Land Type"       value={result.land_type}                                        index={0} />
+                    <MetricCard title="Terrain"         value={result.terrain}                                          index={1} />
+                    <MetricCard title="Elevation"       value={`${result.elevation}m`}                                  index={2} />
+                    <MetricCard title="Gov. Restricted?" value={result.gov_land ? `Yes (${result.gov_type})` : "No"}  alert={result.gov_land} index={3} />
+                    <MetricCard title="On Public Road?" value={result.on_road ? "Yes" : "No"}                          alert={result.on_road}  index={4} />
+                    <MetricCard title="Surroundings"    value={`${result.res_pct}% Res.`} sub={`${result.ind_pct}% Ind.`}                      index={5} />
                   </div>
-                  <h3 className="font-bold text-white mb-2 flex items-center gap-2">
-                    <Info className="w-5 h-5 text-primary" /> What does this mean for me?
-                  </h3>
-                  <p className="text-gray-300 leading-relaxed relative z-10">
-                    {result.explanation}
-                  </p>
-                </div>
-
-                {/* Environmental Metrics */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  <MetricCard title="Land Type" value={result.land_type} />
-                  <MetricCard title="Terrain" value={result.terrain} />
-                  <MetricCard title="Elevation" value={`${result.elevation}m`} />
-                  <MetricCard title="Gov. Restricted?" value={result.gov_land ? `Yes (${result.gov_type})` : "No"} alert={result.gov_land} />
-                  <MetricCard title="On Public Road?" value={result.on_road ? "Yes" : "No"} alert={result.on_road} />
-                  <MetricCard title="Surroundings" value={`${result.res_pct}% Res.`} sub={`${result.ind_pct}% Ind.`} />
-                </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -322,11 +387,18 @@ export default function AnalyzePage() {
   );
 }
 
-function MetricCard({ title, value, sub, alert }: { title: string, value: string | number, sub?: string, alert?: boolean }) {
+function MetricCard({
+  title, value, sub, alert, index = 0,
+}: {
+  title: string; value: string | number; sub?: string; alert?: boolean; index?: number;
+}) {
   return (
-    <div className={`glass-panel p-4 ${alert ? 'border-red-500/50 bg-red-500/5' : ''}`}>
+    <div
+      className={`glass-panel p-4 animate-slide-in-up hover:bg-white/[0.04] transition-colors ${alert ? "border-red-500/50 bg-red-500/5" : ""}`}
+      style={{ animationDelay: `${0.05 + index * 0.07}s` }}
+    >
       <div className="text-xs text-gray-400 mb-1">{title}</div>
-      <div className={`font-bold text-lg ${alert ? 'text-red-400' : 'text-white'}`}>{value}</div>
+      <div className={`font-bold text-lg ${alert ? "text-red-400" : "text-white"}`}>{value}</div>
       {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
     </div>
   );
