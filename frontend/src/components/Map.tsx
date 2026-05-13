@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Circle } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Fix for default marker icons in Leaflet with Next.js
+// Custom pulsing pin marker
 const customIcon = L.divIcon({
   className: "custom-marker",
   html: `<div class="w-6 h-6 bg-primary rounded-full border-4 border-white shadow-[0_0_15px_rgba(59,130,246,0.8)] flex items-center justify-center animate-pulse"></div>`,
@@ -19,6 +19,19 @@ interface MapProps {
   onLocationSelect?: (lat: number, lon: number) => void;
   riskLevel?: "Low" | "Medium" | "High";
   readOnly?: boolean;
+}
+
+// BUG 4 FIX: MapContainer ignores centre/zoom prop changes after first render.
+// This inner component calls useMap() to imperatively fly to new coordinates
+// whenever the lat/lon props change.
+function ChangeView({ lat, lon }: { lat: number; lon: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (lat && lon) {
+      map.flyTo([lat, lon], map.getZoom(), { animate: true, duration: 0.8 });
+    }
+  }, [lat, lon, map]);
+  return null;
 }
 
 function MapClickHandler({ onLocationSelect }: { onLocationSelect: (lat: number, lon: number) => void }) {
@@ -43,10 +56,10 @@ export default function Map({ lat, lon, onLocationSelect, riskLevel, readOnly }:
 
   const getRiskColor = () => {
     switch (riskLevel) {
-      case "High": return "#EF4444";
+      case "High":   return "#EF4444";
       case "Medium": return "#EAB308";
-      case "Low": return "#22C55E";
-      default: return "#3B82F6";
+      case "Low":    return "#22C55E";
+      default:       return "#3B82F6";
     }
   };
 
@@ -61,15 +74,19 @@ export default function Map({ lat, lon, onLocationSelect, riskLevel, readOnly }:
         attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
+
+      {/* Re-center whenever lat/lon props change */}
+      <ChangeView lat={lat} lon={lon} />
+
       {!readOnly && onLocationSelect && <MapClickHandler onLocationSelect={onLocationSelect} />}
-      
+
       <Marker position={[lat, lon]} icon={customIcon} />
-      
+
       {riskLevel && (
         <Circle
           center={[lat, lon]}
           pathOptions={{ color: getRiskColor(), fillColor: getRiskColor(), fillOpacity: 0.2 }}
-          radius={5000} // 5km radius to show surroundings analyzed
+          radius={5000}
         />
       )}
     </MapContainer>

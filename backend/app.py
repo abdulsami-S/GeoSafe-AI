@@ -36,8 +36,11 @@ lakes = gpd.read_file("data/ne_10m_lakes.shp").to_crs(epsg=4326)
 rivers = gpd.read_file("data/ne_10m_rivers_lake_centerlines.shp").to_crs(epsg=4326)
 coast = gpd.read_file("data/ne_10m_coastline.shp").to_crs(epsg=4326)
 
-ocean = ocean.simplify(0.01)
-lakes = lakes.simplify(0.01)
+# BUG 5 FIX: .simplify() returns a GeoSeries, not a GeoDataFrame.
+# Assigning it back loses all columns and CRS metadata.
+# Apply simplify only to the geometry column so the GeoDataFrame is preserved.
+ocean.geometry = ocean.geometry.simplify(0.01)
+lakes.geometry = lakes.geometry.simplify(0.01)
 
 # =========================
 # LANDUSE
@@ -87,7 +90,7 @@ def fast_distance(gdf, sindex, point):
 
         # 4. Return in Kilometers
         return nearby_proj.distance(point_proj).min() / 1000.0
-    except:
+    except Exception:  # BUG 9 FIX: bare except catches SystemExit/KeyboardInterrupt
         return 999.0
 
 # =========================
@@ -103,7 +106,7 @@ def get_buildings(lat, lon):
             bbox=bbox
         )
         return len(buildings)
-    except:
+    except Exception:  # BUG 9 FIX
         return 0
 
 # =========================
@@ -139,7 +142,7 @@ def get_roads_info(lat, lon):
 
         return bool(on_road), bool(near_road), len(roads)
 
-    except:
+    except Exception:  # BUG 9 FIX
         return False, False, 0
 
 # =========================
@@ -149,11 +152,18 @@ ELEVATION_FOLDER = "data/elevation"
 elevation_cache = {}
 
 def get_tile(lat, lon):
-    lat_floor = int(math.floor(lat))
-    lon_floor = int(math.floor(lon))
+    lat_floor = int(math.floor(abs(lat)))
+    lon_floor = int(math.floor(abs(lon)))
+
+    # BUG 6 FIX: The original only matched 'n' (north) and 'e' (east) prefixes.
+    # Coordinates in the Southern or Western hemispheres silently returned
+    # elevation=0. Now we build the correct prefix for all four quadrants.
+    lat_prefix = "n" if lat >= 0 else "s"
+    lon_prefix = "e" if lon >= 0 else "w"
 
     for f in os.listdir(ELEVATION_FOLDER):
-        if f"n{lat_floor:02d}" in f and f"e{lon_floor:03d}" in f:
+        f_lower = f.lower()
+        if f"{lat_prefix}{lat_floor:02d}" in f_lower and f"{lon_prefix}{lon_floor:03d}" in f_lower:
             return os.path.join(ELEVATION_FOLDER, f)
     return None
 
@@ -172,7 +182,7 @@ def get_elevation(lat, lon):
             val = float(list(src.sample([(lon, lat)]))[0][0])
             elevation_cache[key] = val
             return val
-    except:
+    except Exception:  # BUG 9 FIX
         return 0
 
 def terrain_type(e):
@@ -244,8 +254,11 @@ async def check(request_data: CheckRequest):
     in_farmland = check_area(farmland, farmland_sindex, point)
     in_forest = check_area(forest, forest_sindex, point)
 
-    in_ocean = ocean.contains(point).any()
-    in_lake = lakes.contains(point).any()
+    # BUG 8 FIX: Full-scan .contains() on all polygons is very slow.
+    # Use the same check_area() helper every other check already uses,
+    # which filters candidates via R-Tree spatial index first.
+    in_ocean = check_area(ocean, ocean_sindex, point)
+    in_lake  = check_area(lakes, lakes_sindex, point)
 
     dist_river = fast_distance(rivers, rivers_sindex, point)
     dist_lake = fast_distance(lakes, lakes_sindex, point)
@@ -262,7 +275,7 @@ async def check(request_data: CheckRequest):
 
     elevation = get_elevation(lat, lon)
     terrain = terrain_type(elevation)
-    slope = elevation * 0.1
+    # BUG 7 FIX: slope was computed but never used or returned — removed.
 
     # ML RESTORED TRUTH FEATURES (DO NOT ZERO THEM OUT)
     terrain_val = 2 if elevation > 800 else (1 if elevation > 300 else 0)

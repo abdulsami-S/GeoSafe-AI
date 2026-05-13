@@ -1,3 +1,67 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================
+   GeoSafe AI — Design System (CSS Variables)
+   ============================================
+   Every custom Tailwind class (bg-background,
+   text-primary, etc.) maps to these variables.
+   Without them the entire UI renders colorless.
+   ============================================ */
+
+@layer base {
+  :root {
+    /* Core palette */
+    --background: 10 12 20;        /* Near-black slate */
+    --foreground: 240 240 245;     /* Off-white text */
+    --card: 18 22 36;              /* Slightly lighter panel bg */
+    --primary: 59 130 246;         /* Blue-500 accent */
+
+    /* Risk level colors */
+    --safe: 34 197 94;             /* Green-500 */
+    --medium: 234 179 8;           /* Yellow-500 */
+    --high: 239 68 68;             /* Red-500 */
+
+    /* Borders & muted */
+    --border: 255 255 255;
+    --muted: 148 163 184;          /* Slate-400 */
+  }
+
+  /* Apply the dark background globally */
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+  }
+}
+
+/* ============================================
+   Glass Panel — reusable frosted-glass card
+   Used on every panel/card across the app.
+   ============================================ */
+@layer components {
+  .glass-panel {
+    background: rgba(var(--card), 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(var(--border), 0.08);
+    border-radius: 1rem;
+  }
+}
+
+/* ============================================
+   Leaflet overrides — map renders inside
+   glass panels, so we kill default borders.
+   ============================================ */
+.leaflet-container {
+  background: rgb(var(--background)) !important;
+}
+
+.custom-marker {
+  background: none !important;
+  border: none !important;
+}
