@@ -68,8 +68,10 @@ export default function AnalyzePage() {
       
       const data = await response.json();
       setResult(data);
-    } catch (err: any) {
-      setError(err.message || "An error occurred during analysis.");
+    } catch (err: unknown) {
+      // BUG 10 FIX: `catch (err: any)` disables type checking on err.
+      // Use `unknown` and narrow with instanceof to access .message safely.
+      setError(err instanceof Error ? err.message : "An error occurred during analysis.");
     } finally {
       setLoading(false);
     }
