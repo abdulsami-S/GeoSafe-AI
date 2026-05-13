@@ -5,12 +5,17 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap, Circle } from "r
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Custom pulsing pin marker
+// Animated drop-in marker with landing shadow
 const customIcon = L.divIcon({
   className: "custom-marker",
-  html: `<div class="w-6 h-6 bg-primary rounded-full border-4 border-white shadow-[0_0_15px_rgba(59,130,246,0.8)] flex items-center justify-center animate-pulse"></div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
+  html: `
+    <div class="relative flex items-center justify-center" style="width:28px;height:28px">
+      <div class="absolute bottom-[-4px] left-1/2 w-4 h-1 rounded-full bg-black/20 animate-marker-shadow" style="transform:translateX(-50%)"></div>
+      <div class="w-7 h-7 bg-primary rounded-full border-[3px] border-white shadow-[0_0_18px_rgba(59,130,246,0.8)] animate-marker-drop"></div>
+    </div>
+  `,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
 });
 
 interface MapProps {

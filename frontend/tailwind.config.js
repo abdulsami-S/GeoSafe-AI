@@ -27,6 +27,24 @@ module.exports = {
         'l-medium': 'rgb(var(--medium))',
         'l-high':   'rgb(var(--high))',
       },
+      // ── Animation Utilities ──────────────────────
+      // Keyframes are defined in globals.css.
+      // These entries create the animate-* classes.
+      animation: {
+        'geo-spin':         'geo-spin 1.1s linear infinite',
+        'geo-spin-reverse': 'geo-spin-reverse 1.6s linear infinite',
+        'scanner-ping':     'scanner-ping 1.8s ease-out infinite',
+        'fade-in-up':       'fade-in-up 0.6s ease-out both',
+        'pulse-danger':     'pulse-danger 2s ease-in-out infinite',
+        'glow-safe':        'glow-safe 3s ease-in-out infinite',
+        'glow-medium':      'glow-medium 2.5s ease-in-out infinite',
+        'marker-drop':      'marker-drop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both',
+        'marker-shadow':    'marker-shadow 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both',
+        'slide-in-up':      'slide-in-up 0.5s ease-out both',
+        'slide-in-left':    'slide-in-left 0.5s ease-out both',
+        'step-fade-in':     'step-fade-in 0.4s ease-out both',
+        'dot-pulse':        'dot-pulse 1.4s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

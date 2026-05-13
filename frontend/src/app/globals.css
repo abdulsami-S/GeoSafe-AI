@@ -65,3 +65,189 @@
   background: none !important;
   border: none !important;
 }
+
+/* ============================================
+   ANIMATION KEYFRAMES
+   ============================================
+   All animations referenced by Tailwind's
+   animate-* utilities defined in tailwind.config.
+   ============================================ */
+
+/* ── 1. Loading Spinner ─────────────────────
+   Dual-ring orbital spinner: outer ring spins
+   clockwise, inner ring counter-clockwise.     */
+
+@keyframes geo-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes geo-spin-reverse {
+  to { transform: rotate(-360deg); }
+}
+
+/* Ping outward ripple on the spinner centre */
+@keyframes scanner-ping {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* ── 2. Fade-In-Up ──────────────────────────
+   Results panel entrance: fades in while
+   sliding 24px upward into its final position. */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── 3a. Pulse-Danger (High Risk) ───────────
+   Rhythmic red box-shadow pulse that grabs
+   attention for dangerous land scores.          */
+
+@keyframes pulse-danger {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(239, 68, 68, 0.4),
+      inset 0 0 8px rgba(239, 68, 68, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 0 24px 8px rgba(239, 68, 68, 0.18),
+      inset 0 0 12px rgba(239, 68, 68, 0.1);
+  }
+}
+
+/* ── 3b. Glow-Safe (Low Risk) ───────────────
+   Gentle green glow that radiates calmness.    */
+
+@keyframes glow-safe {
+  0%, 100% {
+    box-shadow:
+      0 0 8px 2px rgba(34, 197, 94, 0.12),
+      inset 0 0 6px rgba(34, 197, 94, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 22px 8px rgba(34, 197, 94, 0.22),
+      inset 0 0 10px rgba(34, 197, 94, 0.08);
+  }
+}
+
+/* ── 3c. Glow-Medium (Medium Risk) ──────────
+   Warm amber halo for moderate risk.            */
+
+@keyframes glow-medium {
+  0%, 100% {
+    box-shadow:
+      0 0 8px 2px rgba(234, 179, 8, 0.12),
+      inset 0 0 6px rgba(234, 179, 8, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 20px 7px rgba(234, 179, 8, 0.2),
+      inset 0 0 10px rgba(234, 179, 8, 0.07);
+  }
+}
+
+/* ── 4. Marker Drop ─────────────────────────
+   Pin drops from above with a satisfying
+   overshoot bounce.                             */
+
+@keyframes marker-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.5);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(6px) scale(1.1);
+  }
+  75% {
+    transform: translateY(-3px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Shadow that "lands" beneath the marker */
+@keyframes marker-shadow {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  55% {
+    opacity: 0.25;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+}
+
+/* ── 5. Slide-In-Up ─────────────────────────
+   Card entrance: slides up from below with
+   a gentle ease-out deceleration curve.         */
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide from left — used for the AI insight box */
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ── Loading step stagger ───────────────────
+   Each processing step fades in sequentially.   */
+
+@keyframes step-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Pulsing dot for loading steps */
+@keyframes dot-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 1;
+  }
+}
