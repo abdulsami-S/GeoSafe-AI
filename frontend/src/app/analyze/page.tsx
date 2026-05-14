@@ -226,8 +226,8 @@ export default function AnalyzePage() {
   const mapLon = parseFloat(debouncedLon) || 0;
 
   return (
-    <div className="min-h-screen pt-8 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      <div className="mb-8">
+    <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div className="mb-8 text-center lg:text-left">
         <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
           Analyze Land Safety
         </h1>
@@ -240,7 +240,7 @@ export default function AnalyzePage() {
 
         {/* Left Column: Form + Map */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="glass-panel p-6">
+          <div className="glass-panel p-6 sm:p-8">
             <form onSubmit={analyzeLand} className="space-y-4">
               <div className="flex justify-between items-center mb-2">
                 <label className="text-sm font-semibold text-white flex items-center gap-2">
@@ -270,7 +270,7 @@ export default function AnalyzePage() {
                   placeholder="Latitude"
                   value={lat}
                   onChange={(e) => setLat(e.target.value)}
-                  className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                  className="w-full bg-[rgba(10,12,20,0.5)] border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                 />
                 <input
                   id="lon-input"
@@ -279,7 +279,7 @@ export default function AnalyzePage() {
                   placeholder="Longitude"
                   value={lon}
                   onChange={(e) => setLon(e.target.value)}
-                  className="w-full bg-background/50 border border-white/10 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                  className="w-full bg-[rgba(10,12,20,0.5)] border border-white/10 rounded-lg px-4 py-3 text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
                 />
               </div>
 
@@ -295,13 +295,18 @@ export default function AnalyzePage() {
                     id="purpose-select"
                     value={purpose}
                     onChange={(e) => setPurpose(e.target.value)}
-                    className="w-full bg-card/80 border border-white/10 rounded-lg px-4 py-2.5 pr-10 text-white focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all appearance-none cursor-pointer hover:border-white/20"
-                    style={{ colorScheme: "dark" }}
+                    className="w-full rounded-lg px-4 py-3 pr-10 text-white focus:ring-2 focus:ring-primary outline-none transition-all appearance-none cursor-pointer"
+                    style={{
+                      colorScheme: "dark",
+                      backgroundColor: "rgb(14, 17, 28)",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      color: "white",
+                    }}
                   >
-                    <option value="General"     className="bg-gray-900 text-white">General Analysis</option>
-                    <option value="Residential" className="bg-gray-900 text-white">Residential (Housing)</option>
-                    <option value="Industrial"  className="bg-gray-900 text-white">Industrial (Factories)</option>
-                    <option value="Farming"     className="bg-gray-900 text-white">Farming (Agriculture)</option>
+                    <option value="General"     style={{ backgroundColor: "#111827", color: "white" }}>General Analysis</option>
+                    <option value="Residential" style={{ backgroundColor: "#111827", color: "white" }}>Residential (Housing)</option>
+                    <option value="Industrial"  style={{ backgroundColor: "#111827", color: "white" }}>Industrial (Factories)</option>
+                    <option value="Farming"     style={{ backgroundColor: "#111827", color: "white" }}>Farming (Agriculture)</option>
                   </select>
                   {/* Custom chevron arrow */}
                   <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
@@ -316,7 +321,7 @@ export default function AnalyzePage() {
                 id="analyze-btn"
                 type="submit"
                 disabled={loading}
-                className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+                className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white font-bold py-3.5 rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.5)] text-base"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">

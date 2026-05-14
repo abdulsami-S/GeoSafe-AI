@@ -5,7 +5,7 @@ import { Code2, Users, Database, Globe, BrainCircuit } from "lucide-react";
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen pt-8 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       
       {/* Story Section */}
       <section className="text-center mb-24 max-w-3xl mx-auto">
@@ -20,7 +20,13 @@ export default function AboutPage() {
         <h2 className="text-3xl font-bold text-center text-white mb-10">Powered By Open Technology</h2>
         
         <div className="grid md:grid-cols-3 gap-6">
-          <div className="glass-panel p-8 text-center hover:-translate-y-2 transition-transform">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.1 }}
+            transition={{ duration: 0.5 }}
+            className="glass-panel p-8 text-center hover:-translate-y-2 transition-transform"
+          >
             <div className="w-16 h-16 bg-blue-500/20 rounded-2xl mx-auto flex items-center justify-center mb-4">
               <Globe className="w-8 h-8 text-blue-400" />
             </div>
@@ -31,9 +37,15 @@ export default function AboutPage() {
               <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Tailwind CSS</span>
               <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Leaflet.js</span>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="glass-panel p-8 text-center hover:-translate-y-2 transition-transform">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.1 }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+            className="glass-panel p-8 text-center hover:-translate-y-2 transition-transform"
+          >
             <div className="w-16 h-16 bg-green-500/20 rounded-2xl mx-auto flex items-center justify-center mb-4">
               <Database className="w-8 h-8 text-green-400" />
             </div>
@@ -44,9 +56,15 @@ export default function AboutPage() {
               <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">GeoPandas</span>
               <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Shapely</span>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="glass-panel p-8 text-center hover:-translate-y-2 transition-transform">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="glass-panel p-8 text-center hover:-translate-y-2 transition-transform"
+          >
             <div className="w-16 h-16 bg-purple-500/20 rounded-2xl mx-auto flex items-center justify-center mb-4">
               <BrainCircuit className="w-8 h-8 text-purple-400" />
             </div>
@@ -57,7 +75,7 @@ export default function AboutPage() {
               <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Random Forest</span>
               <span className="px-3 py-1 bg-white/5 rounded-full text-xs text-gray-300">Joblib</span>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -78,11 +96,11 @@ export default function AboutPage() {
               key={member.name}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: false, amount: 0 }}
+              viewport={{ once: true, amount: 0 }}
               transition={{ delay: i * 0.1, duration: 0.4 }}
               className="glass-panel p-6 text-center hover:bg-white/5 transition-colors"
             >
-              <div className="w-20 h-20 bg-gradient-to-br from-primary/40 to-primary/10 rounded-full mx-auto mb-4 border-2 border-primary/30 flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-primary/30 flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.4), rgba(59,130,246,0.1))' }}>
                 <span className="text-2xl font-bold text-white">{member.name.charAt(0)}</span>
               </div>
               <h3 className="text-lg font-bold text-white">{member.name}</h3>

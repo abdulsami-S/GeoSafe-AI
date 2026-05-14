@@ -12,25 +12,26 @@ export default function Home() {
     <div className="flex flex-col min-h-screen">
 
       {/* ── Hero Section ──────────────────────────────────────────────────────
-          FIX: Removed bg-[url('/screenshots/background.jpg')] which caused a
-          404 and left the section invisible. Replaced with a pure-CSS animated
-          radial gradient that always renders regardless of static assets.     */}
-      <section className="relative pt-36 pb-24 overflow-hidden">
-        {/* Animated gradient background — no external file needed */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-950 via-background to-emerald-950 opacity-60" />
-        {/* Radial "glow" pulse centred behind the headline */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] rounded-full bg-primary/10 blur-3xl" />
+          Uses pure CSS gradients + dot overlay. No external image dependency.
+          The background is built from layered divs so it always renders.      */}
+      <section className="relative pt-32 pb-28 overflow-hidden bg-[#0a0c14]">
+        {/* Base gradient fill — always visible on any screen */}
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #020c2e 0%, #0a0c14 50%, #011a0a 100%)' }} />
+        {/* Radial "glow" centred behind the headline */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] rounded-full blur-[100px]" style={{ background: 'rgba(59,130,246,0.15)' }} />
+        {/* Secondary accent glow */}
+        <div className="absolute top-[30%] left-[20%] w-[400px] h-[400px] rounded-full blur-[80px]" style={{ background: 'rgba(16,185,129,0.10)' }} />
         {/* Grid dot overlay for depth */}
         <div
-          className="absolute inset-0 opacity-[0.04]"
+          className="absolute inset-0 opacity-[0.06]"
           style={{
             backgroundImage:
-              "radial-gradient(circle, rgb(var(--primary)) 1px, transparent 1px)",
+              "radial-gradient(circle, rgba(59,130,246,0.7) 1px, transparent 1px)",
             backgroundSize: "36px 36px",
           }}
         />
         {/* Bottom fade into page background */}
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-32" style={{ background: 'linear-gradient(to top, #0a0c14, transparent)' }} />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           <motion.div
