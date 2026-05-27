@@ -9,7 +9,7 @@ export default function AboutPage() {
       
       {/* Story Section */}
       <section className="text-center mb-24 max-w-3xl mx-auto">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-6">About GeoSafe AI</h1>
+        <h1 className="font-display text-4xl md:text-5xl font-normal text-white mb-6">About <span className="italic font-light text-primary">GeoSafe AI</span></h1>
         <p className="text-xl text-gray-300 leading-relaxed">
           We built GeoSafe AI to democratize spatial intelligence. Historically, accessing land safety data required expensive GIS software and specialized knowledge. We combined open-source geospatial data with machine learning to provide instant, accessible, and accurate land analysis for everyone.
         </p>
@@ -17,7 +17,7 @@ export default function AboutPage() {
 
       {/* Tech Stack Visualization */}
       <section className="mb-24">
-        <h2 className="text-3xl font-bold text-center text-white mb-10">Powered By Open Technology</h2>
+        <h2 className="font-display text-3xl font-normal text-center text-white mb-10">Powered By <span className="italic font-light text-primary">Open Technology</span></h2>
         
         <div className="grid md:grid-cols-3 gap-6">
           <motion.div
@@ -81,8 +81,8 @@ export default function AboutPage() {
 
       {/* Team Section */}
       <section className="mb-24">
-        <h2 className="text-3xl font-bold text-center text-white mb-10 flex items-center justify-center gap-3">
-          <Users className="w-8 h-8 text-primary" /> Meet The Team
+        <h2 className="font-display text-3xl font-normal text-center text-white mb-10 flex items-center justify-center gap-3">
+          <Users className="w-8 h-8 text-primary" /> Meet The <span className="italic font-light text-primary">Team</span>
         </h2>
         
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">

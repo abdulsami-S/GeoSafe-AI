@@ -228,8 +228,8 @@ export default function AnalyzePage() {
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       <div className="mb-8 text-center lg:text-left">
-        <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
-          Analyze Land Safety
+        <h1 className="font-display text-3xl md:text-4xl font-normal text-white mb-2">
+          Analyze Land <span className="italic font-light text-primary">Safety</span>
         </h1>
         <p className="text-gray-400">
           Select a location to run instant AI spatial analysis.

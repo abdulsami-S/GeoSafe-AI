@@ -40,20 +40,20 @@ export default function Home() {
             transition={{ duration: 0.6 }}
           >
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-semibold font-display mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-semibold tracking-widest uppercase mb-8">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               AI-Powered Geospatial Analysis
             </div>
 
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
-              <span className="text-white">Know Your Land</span>
+            <h1 className="font-display text-5xl md:text-7xl font-normal tracking-tight mb-6 leading-tight">
+              <span className="text-white italic">Know Your Land</span>
               <br />
-              <span className="bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent font-medium">
                 Before You Build
               </span>
             </h1>
 
-            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-10 leading-relaxed">
+            <p className="text-xl md:text-2xl text-gray-300 max-w-3xl mx-auto mb-10 leading-relaxed font-light">
               Advanced spatial intelligence and machine learning to analyze land
               safety, environmental risks, and suitability in seconds.
             </p>
@@ -61,14 +61,14 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/analyze"
-                className="font-display bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-full text-lg font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.6)] hover:shadow-[0_0_35px_rgba(59,130,246,0.85)] flex items-center justify-center gap-2 group"
+                className="font-sans tracking-widest uppercase bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-full text-xs font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.6)] hover:shadow-[0_0_35px_rgba(59,130,246,0.85)] flex items-center justify-center gap-2 group"
               >
                 Analyze Your Land Now
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
                 href="/how-it-works"
-                className="font-display glass-panel hover:bg-white/5 text-white px-8 py-4 rounded-full text-lg font-bold transition-all flex items-center justify-center"
+                className="font-sans tracking-widest uppercase glass-panel hover:bg-white/5 text-white px-8 py-4 rounded-full text-xs font-bold transition-all flex items-center justify-center"
               >
                 See How It Works
               </Link>
@@ -94,8 +94,8 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
               >
-                <div className="font-display text-4xl font-black text-white mb-2">{stat.value}</div>
-                <div className="text-sm text-gray-400 font-medium uppercase tracking-wider">
+                <div className="font-display text-5xl font-light text-white mb-2">{stat.value}</div>
+                <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">
                   {stat.label}
                 </div>
               </motion.div>
@@ -108,7 +108,7 @@ export default function Home() {
       <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Simple, Powerful Process</h2>
+            <h2 className="font-display text-3xl md:text-4xl font-normal text-white mb-4">Simple, <span className="italic font-light text-primary">Powerful</span> Process</h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
               Non-technical? No problem. Get enterprise-grade spatial analysis in three simple steps.
             </p>
@@ -146,7 +146,7 @@ export default function Home() {
       <section className="py-24 bg-white/[0.02]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Comprehensive Features</h2>
+            <h2 className="font-display text-3xl md:text-4xl font-normal text-white mb-4">Comprehensive <span className="italic font-light text-primary">Features</span></h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -183,7 +183,7 @@ export default function Home() {
       <section className="py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Who Is This For?</h2>
+            <h2 className="font-display text-3xl md:text-4xl font-normal text-white mb-4">Who Is <span className="italic font-light text-primary">This For?</span></h2>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">

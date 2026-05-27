@@ -39,7 +39,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/analyze"
-                className="font-display bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)]"
+                className="font-sans tracking-wider uppercase bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-xs font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)]"
               >
                 Analyze Land
               </Link>
@@ -76,7 +76,7 @@ export default function Navbar() {
           </Link>
           <Link
             href="/analyze"
-            className="block font-display bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-sm font-semibold text-center transition-all"
+            className="block font-sans tracking-wider uppercase bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-xs font-semibold text-center transition-all"
             onClick={() => setMobileOpen(false)}
           >
             Analyze Land

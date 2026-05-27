@@ -8,7 +8,7 @@ export default function HowItWorksPage() {
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
       <div className="text-center mb-16">
-        <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-4">How GeoSafe AI Works</h1>
+        <h1 className="font-display text-4xl md:text-5xl font-normal text-white mb-4">How <span className="italic font-light text-primary">GeoSafe AI</span> Works</h1>
         <p className="text-xl text-gray-400">From a simple map click to advanced spatial intelligence.</p>
       </div>
 

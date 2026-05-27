@@ -9,7 +9,7 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['var(--font-plus-jakarta)', 'sans-serif'],
-        display: ['var(--font-outfit)', 'sans-serif'],
+        display: ['var(--font-cormorant)', 'serif'],
       },
       // All custom color classes (bg-background, text-primary, etc.)
       // are mapped to the CSS variables defined in globals.css.
