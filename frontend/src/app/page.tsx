@@ -40,7 +40,7 @@ export default function Home() {
             transition={{ duration: 0.6 }}
           >
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-medium mb-8">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-semibold font-display mb-8">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               AI-Powered Geospatial Analysis
             </div>
@@ -61,14 +61,14 @@ export default function Home() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/analyze"
-                className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-full text-lg font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.6)] hover:shadow-[0_0_35px_rgba(59,130,246,0.85)] flex items-center justify-center gap-2 group"
+                className="font-display bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-full text-lg font-bold transition-all shadow-[0_0_20px_rgba(59,130,246,0.6)] hover:shadow-[0_0_35px_rgba(59,130,246,0.85)] flex items-center justify-center gap-2 group"
               >
                 Analyze Your Land Now
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
                 href="/how-it-works"
-                className="glass-panel hover:bg-white/5 text-white px-8 py-4 rounded-full text-lg font-bold transition-all flex items-center justify-center"
+                className="font-display glass-panel hover:bg-white/5 text-white px-8 py-4 rounded-full text-lg font-bold transition-all flex items-center justify-center"
               >
                 See How It Works
               </Link>
@@ -94,7 +94,7 @@ export default function Home() {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
               >
-                <div className="text-4xl font-black text-white mb-2">{stat.value}</div>
+                <div className="font-display text-4xl font-black text-white mb-2">{stat.value}</div>
                 <div className="text-sm text-gray-400 font-medium uppercase tracking-wider">
                   {stat.label}
                 </div>

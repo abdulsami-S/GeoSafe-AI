@@ -321,7 +321,7 @@ export default function AnalyzePage() {
                 id="analyze-btn"
                 type="submit"
                 disabled={loading}
-                className="w-full bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white font-bold py-3.5 rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.5)] text-base"
+                className="w-full font-display bg-primary hover:bg-primary/90 disabled:bg-primary/50 text-white font-bold py-3.5 rounded-lg transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(59,130,246,0.5)] text-base"
               >
                 {loading ? (
                   <span className="flex items-center gap-2">
@@ -354,7 +354,7 @@ export default function AnalyzePage() {
               <button
                 id="show-map-btn"
                 onClick={() => setShowMap(true)}
-                className="w-full flex items-center justify-center gap-3 py-6 text-gray-400 hover:text-white hover:bg-white/5 transition-colors rounded-xl"
+                className="w-full font-display flex items-center justify-center gap-3 py-6 text-gray-400 hover:text-white hover:bg-white/5 transition-colors rounded-xl"
               >
                 <MapIcon className="w-5 h-5 text-primary" />
                 <span className="text-sm font-medium">Show Interactive Map</span>
@@ -578,7 +578,7 @@ function MetricCard({
       style={{ animationDelay: `${0.05 + index * 0.07}s` }}
     >
       <div className="text-xs text-gray-400 mb-1">{title}</div>
-      <div className={`font-bold text-lg ${alert ? "text-red-400" : "text-white"}`}>
+      <div className={`font-display font-bold text-lg ${alert ? "text-red-400" : "text-white"}`}>
         {value}
       </div>
       {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}

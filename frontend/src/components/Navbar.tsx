@@ -16,7 +16,7 @@ export default function Navbar() {
               <div className="bg-primary/20 p-2 rounded-lg group-hover:bg-primary/30 transition-colors">
                 <Map className="w-6 h-6 text-primary" />
               </div>
-              <span className="font-bold text-xl tracking-tight text-white">
+              <span className="font-display font-bold text-xl tracking-tight text-white">
                 GeoSafe <span className="text-primary">AI</span>
               </span>
             </Link>
@@ -39,7 +39,7 @@ export default function Navbar() {
               </Link>
               <Link
                 href="/analyze"
-                className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)]"
+                className="font-display bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-sm font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.5)] hover:shadow-[0_0_25px_rgba(59,130,246,0.7)]"
               >
                 Analyze Land
               </Link>
@@ -76,7 +76,7 @@ export default function Navbar() {
           </Link>
           <Link
             href="/analyze"
-            className="block bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-sm font-semibold text-center transition-all"
+            className="block font-display bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-full text-sm font-semibold text-center transition-all"
             onClick={() => setMobileOpen(false)}
           >
             Analyze Land

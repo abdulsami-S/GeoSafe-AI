@@ -7,6 +7,10 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-plus-jakarta)', 'sans-serif'],
+        display: ['var(--font-outfit)', 'sans-serif'],
+      },
       // All custom color classes (bg-background, text-primary, etc.)
       // are mapped to the CSS variables defined in globals.css.
       // Using RGB channels allows Tailwind's opacity modifier to work,

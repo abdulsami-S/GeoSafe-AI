@@ -76,7 +76,7 @@ function Step({ number, icon: Icon, title, description, tech }: StepProps) {
       className="relative z-10 flex gap-5 md:gap-8 items-start"
     >
       {/* Step number badge — sits on the timeline */}
-      <div className="relative z-20 shrink-0 w-14 h-14 bg-[rgb(10,12,20)] border-[3px] border-primary/40 rounded-full flex items-center justify-center text-primary font-bold text-xl hover:border-primary hover:bg-primary/10 transition-colors shadow-[0_0_15px_rgba(59,130,246,0.25)]">
+      <div className="relative z-20 shrink-0 w-14 h-14 bg-[rgb(10,12,20)] border-[3px] border-primary/40 rounded-full flex items-center justify-center text-primary font-display font-bold text-xl hover:border-primary hover:bg-primary/10 transition-colors shadow-[0_0_15px_rgba(59,130,246,0.25)]">
         {number}
       </div>
 

@@ -31,11 +31,18 @@
   /* Apply the dark background globally */
   html {
     color-scheme: dark;
+    font-family: var(--font-plus-jakarta), sans-serif;
   }
 
   body {
     background-color: rgb(var(--background));
     color: rgb(var(--foreground));
+    font-family: var(--font-plus-jakarta), sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-display {
+    font-family: var(--font-outfit), sans-serif;
+    letter-spacing: -0.015em;
   }
 }
 
