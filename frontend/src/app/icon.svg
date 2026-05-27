@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Location Pin in vibrant brand blue -->
+  <path d="M16 2C10 2 5 7 5 13c0 8.5 11 17 11 17s11-8.5 11-17c0-6-5-11-11-11z" fill="#3b82f6" />
+  
+  <!-- High-contrast white circular center backing -->
+  <circle cx="16" cy="13" r="6.5" fill="#ffffff" />
+  
+  <!-- Safety verification checkmark in emerald green -->
+  <path d="M13.5 13l1.8 1.8 3.5-3.5" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
