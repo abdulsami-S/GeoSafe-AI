@@ -1,4 +1,4 @@
-""use client";
+"use client";
 
 import Link from "next/link";
 import { Map, Menu, X } from "lucide-react";
