@@ -360,14 +360,57 @@ export default function AnalyzePage() {
                 <span className="text-sm font-medium">Show Interactive Map</span>
               </button>
             ) : (
-              <div className="h-[400px] relative animate-fade-in-up">
+              <div className="h-[400px] relative overflow-hidden rounded-xl animate-fade-in-up">
                 <MapWrapper
                   lat={mapLat}
                   lon={mapLon}
                   onLocationSelect={handleMapSelect}
                   riskLevel={result?.risk}
                 />
-                <div className="absolute top-4 left-4 z-[400] bg-black/60 backdrop-blur text-white text-xs px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
+                
+                {/* Radar scanning sweep overlay while loading */}
+                <AnimatePresence>
+                  {loading && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="absolute inset-0 bg-[#0a0c14]/50 z-[400] pointer-events-none flex items-center justify-center overflow-hidden border border-primary/20 rounded-xl"
+                    >
+                      {/* Sweeping scanline */}
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/30 to-transparent h-1/2 w-full origin-top"
+                        animate={{ y: ["-100%", "200%"] }}
+                        transition={{ repeat: Infinity, duration: 2.2, ease: "linear" }}
+                      />
+                      
+                      {/* Sonar concentric ripples */}
+                      <div className="relative w-80 h-80 rounded-full border border-primary/20 flex items-center justify-center">
+                        <motion.div 
+                          className="absolute rounded-full border border-primary/40 w-full h-full"
+                          animate={{ scale: [0.1, 1], opacity: [1, 0] }}
+                          transition={{ repeat: Infinity, duration: 2.5, ease: "easeOut" }}
+                        />
+                        <motion.div 
+                          className="absolute rounded-full border border-primary/25 w-full h-full"
+                          animate={{ scale: [0.1, 1], opacity: [1, 0] }}
+                          transition={{ repeat: Infinity, duration: 2.5, ease: "easeOut", delay: 0.8 }}
+                        />
+                        <motion.div 
+                          className="absolute rounded-full border border-primary/10 w-full h-full"
+                          animate={{ scale: [0.1, 1], opacity: [1, 0] }}
+                          transition={{ repeat: Infinity, duration: 2.5, ease: "easeOut", delay: 1.6 }}
+                        />
+                        {/* Crosshairs */}
+                        <div className="absolute w-full h-[0.5px] bg-primary/25" />
+                        <div className="absolute h-full w-[0.5px] bg-primary/25" />
+                        <span className="text-[10px] text-primary/70 font-mono tracking-widest absolute bg-black/75 px-2 py-0.5 rounded border border-primary/20">SCANNING AREA</span>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="absolute top-4 left-4 z-[399] bg-black/60 backdrop-blur text-white text-xs px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
                   <InfoIcon className="w-3 h-3 text-primary" /> Click map to select location
                 </div>
               </div>
@@ -482,8 +525,11 @@ export default function AnalyzePage() {
               >
                 {/* Phase 1 — Risk Banner (appears immediately) */}
                 {revealPhase !== "none" && (
-                  <div
-                    className={`glass-panel p-6 flex flex-col sm:flex-row items-center justify-between border-l-4 transition-shadow duration-500 animate-fade-in-up ${
+                  <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 100, damping: 15 }}
+                    className={`glass-panel p-6 flex flex-col sm:flex-row items-center justify-between border-l-4 transition-shadow duration-500 ${
                       result.risk === "High"
                         ? "border-l-high   bg-high/5   animate-pulse-danger"
                         : result.risk === "Medium"
@@ -501,7 +547,7 @@ export default function AnalyzePage() {
                       }`}>
                         {result.risk === "High"   ? <ShieldAlert   className="w-7 h-7" /> :
                          result.risk === "Medium" ? <AlertTriangle className="w-7 h-7" /> :
-                                                    <CheckCircle   className="w-7 h-7" />}
+                                                     <CheckCircle   className="w-7 h-7" />}
                       </div>
                       <div>
                         <p className="text-sm text-gray-400 font-medium">AI Risk Assessment</p>
@@ -519,14 +565,16 @@ export default function AnalyzePage() {
                     >
                       <Share2 className="w-4 h-4" /> Share Result
                     </button>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* Phase 2 — AI Explanation Box (appears after 300 ms) */}
                 {(revealPhase === "explanation" || revealPhase === "metrics") && (
-                  <div
-                    className="glass-panel p-6 bg-primary/5 border-primary/20 relative overflow-hidden animate-slide-in-left"
-                    style={{ animationDelay: "0s" }}
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="glass-panel p-6 bg-primary/5 border-primary/20 relative overflow-hidden"
                   >
                     <div className="absolute top-0 right-0 p-4 opacity-10">
                       <Target className="w-24 h-24 text-primary" />
@@ -535,9 +583,9 @@ export default function AnalyzePage() {
                       <Info className="w-5 h-5 text-primary" /> What does this mean for me?
                     </h3>
                     <p className="text-gray-300 leading-relaxed relative z-10">
-                      {result.explanation}
+                      <TypewriterText text={result.explanation} />
                     </p>
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* Phase 3 — Metric Cards (appears after 600 ms, staggered) */}
@@ -571,17 +619,61 @@ function MetricCard({
   index?: number;
 }) {
   return (
-    <div
-      className={`glass-panel p-4 animate-slide-in-up hover:bg-white/[0.04] transition-colors ${
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: index * 0.06 }}
+      whileHover={{ scale: 1.03, backgroundColor: "rgba(255, 255, 255, 0.04)" }}
+      className={`glass-panel p-4 transition-colors duration-250 ${
         alert ? "border-red-500/50 bg-red-500/5" : ""
       }`}
-      style={{ animationDelay: `${0.05 + index * 0.07}s` }}
     >
       <div className="text-xs text-gray-400 mb-1">{title}</div>
       <div className={`font-display font-bold text-lg ${alert ? "text-red-400" : "text-white"}`}>
         {value}
       </div>
       {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
-    </div>
+    </motion.div>
+  );
+}
+
+// ── Typewriter component for AI Insight reveal ────────────────────────────────
+function TypewriterText({ text }: { text: string }) {
+  const words = text.split(" ");
+  
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.025 }
+    }
+  };
+  
+  const childVariants = {
+    hidden: { opacity: 0, y: 4 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.25, ease: "easeOut" as const }
+    }
+  };
+  
+  return (
+    <motion.span
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="inline-block"
+    >
+      {words.map((word, idx) => (
+        <motion.span
+          key={idx}
+          variants={childVariants}
+          className="inline-block mr-1"
+        >
+          {word}
+        </motion.span>
+      ))}
+    </motion.span>
   );
 }

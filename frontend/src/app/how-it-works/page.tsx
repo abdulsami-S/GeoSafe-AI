@@ -1,21 +1,45 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useRef } from "react";
+import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
 import { MapPin, Layers, Cpu, ShieldAlert, ChevronDown, ChevronUp, LucideIcon } from "lucide-react";
 
 export default function HowItWorksPage() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Track scroll progress inside the timeline container
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start center", "end center"],
+  });
+
+  // Smooth the scroll progress line using spring physics
+  const scaleY = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
+
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
       <div className="text-center mb-16">
-        <h1 className="font-display text-4xl md:text-5xl font-normal text-white mb-4">How <span className="italic font-light text-primary">GeoSafe AI</span> Works</h1>
+        <h1 className="font-display text-4xl md:text-5xl font-normal text-white mb-4">
+          How <span className="italic font-light text-primary">GeoSafe AI</span> Works
+        </h1>
         <p className="text-xl text-gray-400">From a simple map click to advanced spatial intelligence.</p>
       </div>
 
-      <div className="space-y-8 relative min-h-[600px]">
-        {/* Vertical timeline line — sits behind cards */}
+      <div ref={containerRef} className="space-y-8 relative min-h-[600px]">
+        {/* Background track line */}
         <div
-          className="absolute left-7 md:left-1/2 md:-translate-x-px top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary/60 via-primary/30 to-transparent pointer-events-none"
+          className="absolute left-7 md:left-1/2 md:-translate-x-px top-0 bottom-0 w-0.5 bg-white/5 pointer-events-none"
+          aria-hidden="true"
+        />
+
+        {/* Animated active fill line */}
+        <motion.div
+          style={{ scaleY, originY: 0 }}
+          className="absolute left-7 md:left-1/2 md:-translate-x-px top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary via-primary/70 to-primary/10 pointer-events-none z-[5]"
           aria-hidden="true"
         />
 
@@ -76,12 +100,27 @@ function Step({ number, icon: Icon, title, description, tech }: StepProps) {
       className="relative z-10 flex gap-5 md:gap-8 items-start"
     >
       {/* Step number badge — sits on the timeline */}
-      <div className="relative z-20 shrink-0 w-14 h-14 bg-[rgb(10,12,20)] border-[3px] border-primary/40 rounded-full flex items-center justify-center text-primary font-display font-bold text-xl hover:border-primary hover:bg-primary/10 transition-colors shadow-[0_0_15px_rgba(59,130,246,0.25)]">
+      <motion.div 
+        className="relative z-20 shrink-0 w-14 h-14 bg-[rgb(10,12,20)] border-[3px] border-primary/45 rounded-full flex items-center justify-center text-primary font-display font-bold text-xl cursor-pointer shadow-[0_0_15px_rgba(59,130,246,0.25)]"
+        whileHover={{
+          scale: 1.1,
+          borderColor: "rgb(59,130,246)",
+          backgroundColor: "rgba(59,130,246,0.15)",
+          boxShadow: "0 0 25px rgba(59,130,246,0.5)"
+        }}
+      >
         {number}
-      </div>
+      </motion.div>
 
       {/* Card content — always takes remaining width */}
-      <div className="flex-1 glass-panel p-6 hover:bg-white/[0.04] transition-colors">
+      <motion.div 
+        className="flex-1 glass-panel p-6 transition-all duration-300 hover:border-primary/20"
+        whileHover={{
+          scale: 1.015,
+          backgroundColor: "rgba(255, 255, 255, 0.04)",
+          boxShadow: "0 10px 25px -10px rgba(59,130,246,0.15)"
+        }}
+      >
         <div className="flex items-center gap-3 mb-3">
           <div className="p-2 bg-primary/20 rounded-lg">
             <Icon className="w-6 h-6 text-primary" />
@@ -115,7 +154,7 @@ function Step({ number, icon: Icon, title, description, tech }: StepProps) {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
     </motion.div>
   );
 }
