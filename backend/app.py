@@ -42,7 +42,7 @@ def _cache_key(lat: float, lon: float, purpose: str) -> tuple:
 # =============================================================================
 # LOAD MODEL
 # =============================================================================
-model = joblib.load("ML/model.pkl")
+model = joblib.load(r"D:\GeoSafe-AI\backend\ML\model.pkl")
 
 # =============================================================================
 # PERF 1 — STARTUP GIS SHAPEFILE LOADING (natural earth layers)
@@ -57,10 +57,11 @@ model = joblib.load("ML/model.pkl")
 # in fast_distance().
 # =============================================================================
 print("[startup] Loading natural-earth layers…")
-ocean  = gpd.read_file("data/ne_10m_ocean.shp").to_crs(epsg=4326)
-lakes  = gpd.read_file("data/ne_10m_lakes.shp").to_crs(epsg=4326)
-rivers = gpd.read_file("data/ne_10m_rivers_lake_centerlines.shp").to_crs(epsg=4326)
-coast  = gpd.read_file("data/ne_10m_coastline.shp").to_crs(epsg=4326)
+DATA_DIR = r"D:\GeoSafe-AI\backend\data"
+ocean  = gpd.read_file(os.path.join(DATA_DIR, "ne_10m_ocean.shp")).to_crs(epsg=4326)
+lakes  = gpd.read_file(os.path.join(DATA_DIR, "ne_10m_lakes.shp")).to_crs(epsg=4326)
+rivers = gpd.read_file(os.path.join(DATA_DIR, "ne_10m_rivers_lake_centerlines.shp")).to_crs(epsg=4326)
+coast  = gpd.read_file(os.path.join(DATA_DIR, "ne_10m_coastline.shp")).to_crs(epsg=4326)
 
 # .simplify() on the geometry column only — preserves CRS + all attribute
 # columns on the GeoDataFrame (assigning to the full frame would drop them).
@@ -71,7 +72,7 @@ lakes.geometry = lakes.geometry.simplify(0.01)
 # LANDUSE — loaded once at startup
 # =============================================================================
 print("[startup] Loading landuse layer…")
-landuse     = gpd.read_file("data/gis_osm_landuse_a_free_1.shp").to_crs(epsg=4326)
+landuse     = gpd.read_file(os.path.join(DATA_DIR, "gis_osm_landuse_a_free_1.shp")).to_crs(epsg=4326)
 residential = landuse[landuse["fclass"] == "residential"]
 industrial  = landuse[landuse["fclass"] == "industrial"]
 farmland    = landuse[landuse["fclass"] == "farmland"]
@@ -89,7 +90,7 @@ forest      = landuse[landuse["fclass"] == "forest"]
 # the candidate rows — zero disk I/O after startup.
 # =============================================================================
 print("[startup] Loading buildings shapefile…")
-buildings_gdf    = gpd.read_file("data/gis_osm_buildings_a_free_1.shp").to_crs(epsg=4326)
+buildings_gdf    = gpd.read_file(os.path.join(DATA_DIR, "gis_osm_buildings_a_free_1.shp")).to_crs(epsg=4326)
 buildings_sindex = buildings_gdf.sindex   # R-tree built once here
 print(f"[startup] {len(buildings_gdf):,} buildings loaded.")
 
@@ -100,7 +101,7 @@ print(f"[startup] {len(buildings_gdf):,} buildings loaded.")
 # road classes we use, reducing both RAM usage and index size.
 # =============================================================================
 print("[startup] Loading roads shapefile…")
-_roads_raw = gpd.read_file("data/gis_osm_roads_free_1.shp").to_crs(epsg=4326)
+_roads_raw = gpd.read_file(os.path.join(DATA_DIR, "gis_osm_roads_free_1.shp")).to_crs(epsg=4326)
 roads_gdf  = _roads_raw[_roads_raw["fclass"].isin([
     "primary", "secondary", "residential", "tertiary"
 ])].copy()
@@ -215,7 +216,7 @@ def get_roads_info(lat: float, lon: float):
 # =============================================================================
 # ELEVATION — per-tile open + in-memory value cache (already optimised)
 # =============================================================================
-ELEVATION_FOLDER = "data/elevation"
+ELEVATION_FOLDER = r"D:\GeoSafe-AI\backend\data\elevation"
 elevation_cache: dict = {}
 
 def get_tile(lat, lon):
