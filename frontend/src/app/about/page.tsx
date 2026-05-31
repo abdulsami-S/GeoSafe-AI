@@ -5,10 +5,35 @@ import { Code2, Users, Database, Globe, BrainCircuit } from "lucide-react";
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      
+    <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative overflow-hidden">
+      {/* Background Technology telemetry drift */}
+      <div className="absolute inset-0 overflow-hidden opacity-[0.10] select-none pointer-events-none font-mono text-[9px] text-primary">
+        <motion.div
+          initial={{ x: "-100%" }}
+          animate={{ x: "100%" }}
+          transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
+          className="absolute top-[12%] space-x-32 flex whitespace-nowrap"
+        >
+          <span>import geopandas as gpd</span>
+          <span>from sklearn.ensemble import RandomForestClassifier</span>
+          <span>import rasterio</span>
+          <span>from shapely.geometry import Point</span>
+        </motion.div>
+        <motion.div
+          initial={{ x: "100%" }}
+          animate={{ x: "-100%" }}
+          transition={{ duration: 50, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-[18%] space-x-32 flex whitespace-nowrap"
+        >
+          <span>import next from 'next'</span>
+          <span>import tailwindcss</span>
+          <span>import leaflet as L</span>
+          <span>import framer_motion</span>
+        </motion.div>
+      </div>
+
       {/* Story Section */}
-      <section className="text-center mb-24 max-w-3xl mx-auto">
+      <section className="text-center mb-24 max-w-3xl mx-auto relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}

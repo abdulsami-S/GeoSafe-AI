@@ -8,8 +8,30 @@ export default function HowItWorksPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
-      <div className="text-center mb-16">
+    <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto relative overflow-hidden">
+      {/* Background GIS telemetry drift */}
+      <div className="absolute inset-0 overflow-hidden opacity-[0.12] select-none pointer-events-none font-mono text-[9px] text-primary">
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: "-100%" }}
+          transition={{ duration: 55, repeat: Infinity, ease: "linear" }}
+          className="absolute left-[1%] space-y-36"
+        >
+          <div>EPSG:3857<br/>GRID_CONVERT: OK</div>
+          <div>BBOX_SCAN: 10KM<br/>R-TREE_INIT: TRUE</div>
+        </motion.div>
+        <motion.div
+          initial={{ y: "-100%" }}
+          animate={{ y: "100%" }}
+          transition={{ duration: 65, repeat: Infinity, ease: "linear" }}
+          className="absolute right-[1%] space-y-36"
+        >
+          <div>ML_CLASSIFY: ACTIVE<br/>PROB_DIST: [LOW, MED, HIGH]</div>
+          <div>ELEV_MODEL: SRTM_3ARC<br/>RASTER_SAMPLE: DONE</div>
+        </motion.div>
+      </div>
+
+      <div className="text-center mb-16 relative z-10">
         <h1 className="font-display text-4xl md:text-5xl font-normal text-white mb-4">
           How <span className="italic font-light text-primary">GeoSafe AI</span> Works
         </h1>

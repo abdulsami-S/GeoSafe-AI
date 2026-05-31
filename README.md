@@ -55,11 +55,14 @@ Think of this as a **SaaS-grade spatial intelligence engine**:
 | Feature | Description |
 |---------|-------------|
 | 🎯 **Precision Coordinate Input** | Visual form with debouncing prevents page-freezes, offering coordinates autofill by clicking anywhere on the map or testing with a pre-configured Hyderabad demo coordinate. |
-| 🗺️ **Lazy-Loaded Interactive Map** | Code-split React-Leaflet map rendering a custom dark CartoDB theme with a glowing 5 km risk-colored boundary overlay surrounding the queried parcel. |
+| 🗺️ **Sleek Satellite & Active Glow Map** | Code-split Leaflet map rendering **Esri World Satellite Imagery** and Boundaries overlays with glowing concentric **3 km & 10 km concentric risk-colored range boundaries** and dark **glassmorphism marker popups**. |
 | ⚡ **Progressive Loading UX** | A 4-step animated loader ("Querying GIS...", "Calculating Water...", "Running ML...", "Generating Insights...") that matches backend task durations, reducing perceived latency. |
 | 📊 **Staged Result Reveal** | Multi-phase entrance animations that fade in the Risk Banner, the human-centric AI explanation box, and staggered metric cards sequentially. |
-| 📝 **Human-Centric Insights** | Generates context-aware plain-English explanations (e.g. *"Highly suitable for residential usage. Buffer zones show low forest risk and zero road encroachment."*). |
+| 📝 **Human-Centric Insights** | Generates context-aware plain-English explanations with dynamic warning prefixes for compatibility and restricted zone issues. |
 | 🔗 **Web Share Integration** | Share comprehensive spatial reports via a single click using the native Web Share API or copying details straight to the clipboard. |
+| 🌌 **Themed Contextual Backgrounds** | Drifting coordinates, vertical GIS calculations, expand-topography rings, and scrolling code imports in page backdrops that match each section. |
+| 🧭 **Custom Icon Navbar** | Sleek animated SVG navigation icons (`Home`, `Compass`, `Info`) complete with premium dark tooltips and shared gliding spring backdrop highlights. |
+| 📄 **Legal & Disclaimers Pages** | High-performance, client-side routed `/privacy` and `/terms` pages featuring professional legal details and explicit AI spatial limitations disclaimers. |
 
 ### Under the Hood (Technical GIS & ML Pipeline)
 | Feature | Description |
@@ -67,9 +70,57 @@ Think of this as a **SaaS-grade spatial intelligence engine**:
 | 🌐 **Startup GIS Cache** | Loads and indexes heavy vector files (oceans, lakes, roads, buildings) at FastAPI startup, guaranteeing zero Disk I/O on active user endpoints. |
 | ⛰️ **Real SRTM elevation** | Inspects NASA Shuttle Radar Topography Mission (`.hgt`) raster files locally via Rasterio to fetch exact coordinate heights. |
 | 🧠 **Stratified Random Forest** | Classifier trained on 6,000 synthetic vector samples across multiple environmental layers (lakes, coasts, forests, mountains). |
-| 🛑 **Rule-Based Overrides** | Hardcoded checks force a **High** risk rating if the coordinates land directly on a public road (< 10 m) or within protected state reserves. |
+| ⚖️ **Zoning & Compatibility Overrides** | Rule-based safety evaluations automatically escalate risk status (to High/Medium) when putting incompatible purposes (e.g. Industrial on Residential land). |
+| 🌾 **Flexible Classification Mapping** | Models logical compatibility pairs (e.g., mapping Farming to Rural, and Residential to Urban/Rural) preventing false mismatch alerts. |
 | 🗃️ **FIFO Query Cache** | Rounded coordinate keys (3 decimal places $\approx 111$ m precision) are stored in an in-memory cache to return repeated parcel analyses instantly. |
 | ⚙️ **Uvicorn Thread Pool** | Heavy computational shapefile mathematics are executed via an async thread-pool executor to prevent blocking the async API server loops. |
+
+## 📡 Sourcing Data & Result Calculations
+
+To deliver instant, high-precision land intelligence reports, GeoSafe AI integrates a robust dual-stage pipeline combining real-world GIS vector/raster databases with Scikit-Learn Machine Learning models.
+
+### 1. Where Does the Data Come From?
+Our backend ingests three primary categories of geographical datasets:
+*   🗺️ **Land Use & Infrastructure (OSM Shapefiles)**: 
+    Sourced from **OpenStreetMap (OSM)** (processed by Geofabrik). Specifically:
+    *   `gis_osm_landuse_a_free_1.shp` maps active sectors such as Residential, Industrial, Farmland, and Forests.
+    *   `gis_osm_buildings_a_free_1.shp` defines structural density and building counts.
+    *   `gis_osm_roads_free_1.shp` pinpoints public road segments and major highways.
+*   🌊 **Natural Environment & Waterways (Natural Earth Vector Layers)**:
+    Sourced from **Natural Earth** (1:10,000,000 global scale) to fetch boundary shapes for oceans, lakes, coastlines, and lake centerlines/rivers.
+*   ⛰️ **Topography & Terrain Elevation (NASA SRTM Raster Tiles)**:
+    Sourced from NASA's **Shuttle Radar Topography Mission (SRTM)** digital elevation data. Specifically, `.hgt` raster grid files (e.g., `n17e078.hgt` at 3-arcsecond grid resolution) are sampled using **Rasterio** to fetch exact elevations in meters for queried coordinates.
+
+---
+
+### 2. How are the Results Calculated? (Step-by-Step)
+When a coordinate analysis is triggered, the engine executes the following computational sequence:
+
+#### Step A: High-Speed Sub-Section GIS Extraction
+Instead of reading millions of global GIS coordinates (which would take minutes), the backend creates a tight bounding box (`SCAN_RADIUS_KM = 10 km`) around the coordinate. Using **pyogrio** and **Shapely**, it queries only the shapes within that localized area.
+
+#### Step B: Point-in-Polygon & Proximity Queries
+*   **Point-in-Polygon checks** verify if the coordinates fall directly inside a mapped shape (e.g., inside an active residential zone or inside a forest reserve).
+*   **Proximity queries** measure the exact geodesic distance to the nearest rivers, coastlines, lakes, and forests. To ensure sub-second speeds, an **R-Tree spatial index** is built on startup, accelerating the geometric search from $O(N) \to O(\log N)$.
+*   **Elevation lookup** samples the elevation in meters from the SRTM raster grid at the exact coordinates.
+
+#### Step C: Surroundings Breakdown
+The engine creates a 10 km radius buffer around the coordinate, intersects it with the loaded OSM shapefile layers, and computes the exact percentage share by area of each sector (e.g., 20% Residential, 0.6% Industrial) to assess the regional landscape.
+
+#### Step D: ML Baseline Risk Classification
+The coordinate's geographical parameters are packaged into a feature vector:
+$$\vec{x} = [\text{dist\_river}, \text{dist\_lake}, \text{dist\_ocean}, \text{dist\_forest}, \text{elevation}, \text{terrain\_val}]$$
+This vector is passed to a pre-trained **Random Forest Classifier** which evaluates the environmental danger score, outputting a base risk class:
+*   **0 (Low Risk)**: Favorable environmental buffers.
+*   **1 (Medium Risk)**: Marginal proximities or elevated terrain.
+*   **2 (High Risk)**: High threat zones (e.g. coastal shores, active landslide boundaries, or floodplanes).
+
+#### Step E: Smart Compatibility & Safety Overrides
+Before returning the final JSON payload, the engine runs rule-based overrides to ensure legal safety:
+*   **Infrastructure Overrides**: If the coordinates land directly on a road, risk is instantly forced to **High** (*"Location is on public road infrastructure!"*).
+*   **Restricted Land Overrides**: If the point lands inside protected forest reserves, water bodies, or active riverbeds, it is forced to **High** (*"Location is restricted..."*).
+*   **Zoning Compatibility Overrides**: The engine compares the chosen **Intended Purpose** with the **Land Type** and dominant surroundings. Mismatches (like building an Industrial factory directly in a Residential neighborhood, or building homes on Industrial soil) escalate the risk to **High** or **Medium** and prepend direct warning alerts.
+*   **Flexible suited Mappings**: Logical configurations (like Farming on Rural land, and Residential on Urban land) are validated as highly compatible.
 
 ---
 
@@ -165,6 +216,10 @@ GeoSafe-AI/
 │   │   │   │   └── page.tsx    ← Coordinates form, loading timeline, and reveal metrics
 │   │   │   ├── 📁 how-it-works/
 │   │   │   │   └── page.tsx    ← Interactive expandable engineering step timeline
+│   │   │   ├── 📁 privacy/
+│   │   │   │   └── page.tsx    ← Privacy statement and query cache specs [NEW]
+│   │   │   ├── 📁 terms/
+│   │   │   │   └── page.tsx    ← Terms of Service and legal/AI limitations disclaimer [NEW]
 │   │   │   ├── globals.css     ← Design variables, keyframes, and font variables
 │   │   │   ├── layout.tsx      ← Root layout (Google Fonts configurations)
 │   │   │   └── page.tsx        ← Hero landing page with stats
@@ -210,9 +265,16 @@ $$\vec{x} = [\text{dist\_river}, \text{dist\_lake}, \text{dist\_ocean}, \text{di
 *   *Note: 10% random Gaussian noise is injected in training data to simulate environmental variations.*
 
 ### Post-ML Rule-Based Deterministic Overrides
-Even if the ML classifier predicts low risk, the engine forces the final risk payload to **High** if:
-1.  The point sits directly **on a public road** ($< 10$ meters from the nearest road segment).
-2.  The point lands within restricted **government zones** (Protected forests, riverbeds, coastal buffer zones).
+Even if the ML classifier predicts low risk, the engine overrides and scales the final risk rating based on direct zoning and land compatibility checks:
+1.  **High Risk Overrides**:
+    *   The point sits directly **on a public road** ($< 10$ meters from the nearest road segment).
+    *   The point lands within restricted **government zones** (Protected forests, water zones, riverbeds, coastal buffer zones).
+    *   **Zoning Conflict**: Attempting to locate **Industrial** factories directly on `Residential` land, **Residential** housing on `Industrial` or `Forest` conservation land, or **Farming** on `Industrial` land (toxic contamination risk).
+2.  **Medium Risk Overrides**:
+    *   **Proximity Conflict**: Establishing heavy industrial projects near densely populated residential surroundings (`res_pct > 15.0%`), or locating housing/farming directly next to industrial sectors (`ind_pct > 10.0%`).
+    *   **Zoning Conversion**: Farming in conservation `Forest` land, or converting active `Farmland` to heavy Industrial setups.
+3.  **Logical Classification Mappings**:
+    *   To prevent false-alarm alerts, the engine maps compatible classification pairs, verifying that `Farming` is directly suited for `Rural` and `Farmland` classifications, and `Residential` is highly compatible with `Urban` and `Rural` areas.
 
 ---
 

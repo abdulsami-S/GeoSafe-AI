@@ -140,8 +140,16 @@ export default function Home() {
       </section>
 
       {/* Stats Section */}
-      <section className="py-12 border-y border-white/5 bg-white/[0.02]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-12 border-y border-white/5 bg-white/[0.02] overflow-hidden">
+        {/* Animated grid lines */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.10] select-none">
+          <motion.div 
+            className="w-[200%] h-full bg-[linear-gradient(to_right,rgba(59,130,246,0.25)_1px,transparent_1px)] bg-[size:40px_100%]"
+            animate={{ x: ["0%", "-50%"] }}
+            transition={{ repeat: Infinity, duration: 30, ease: "linear" }}
+          />
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
               { label: "AI Accuracy",    value: "90%+" },
@@ -167,8 +175,31 @@ export default function Home() {
       </section>
 
       {/* How It Works — 3 Steps */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-24 overflow-hidden">
+        {/* Background data streams drifting left to right */}
+        <div className="absolute inset-0 overflow-hidden opacity-[0.15] pointer-events-none select-none font-mono text-[9px] text-primary">
+          <motion.div
+            initial={{ x: "-100%" }}
+            animate={{ x: "100%" }}
+            transition={{ duration: 35, repeat: Infinity, ease: "linear" }}
+            className="absolute top-[20%] space-x-32 flex whitespace-nowrap"
+          >
+            <span>[GIS_QUERY_OK]</span>
+            <span>DATA_STREAM_FLOWING: 10_LAYERS_LOADED</span>
+            <span>R-TREE_INDEX_BUILD_SUCCESS</span>
+          </motion.div>
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: "-100%" }}
+            transition={{ duration: 42, repeat: Infinity, ease: "linear" }}
+            className="absolute bottom-[25%] space-x-32 flex whitespace-nowrap"
+          >
+            <span>[MODEL_INFERENCE_RUNNING]</span>
+            <span>RANDOM_FOREST_STIFFNESS: 100</span>
+            <span>RISK_CLASSIFICATION_0_1_2</span>
+          </motion.div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-16">
             <h2 className="font-display text-3xl md:text-4xl font-normal text-white mb-4">Simple, <span className="italic font-light text-primary">Powerful</span> Process</h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
@@ -208,8 +239,17 @@ export default function Home() {
       </section>
 
       {/* Features */}
-      <section className="py-24 bg-white/[0.02]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-24 bg-white/[0.02] overflow-hidden">
+        {/* Slowly pulsing topographic concentric rings in the background */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] opacity-[0.12] pointer-events-none select-none z-0">
+          <svg viewBox="0 0 200 200" fill="none" stroke="currentColor" className="text-primary w-full h-full" strokeWidth="0.3">
+            <motion.circle cx="100" cy="100" r="10" animate={{ r: [10, 90], opacity: [0.8, 0] }} transition={{ repeat: Infinity, duration: 12, ease: "linear" }} />
+            <motion.circle cx="100" cy="100" r="30" animate={{ r: [30, 110], opacity: [0.7, 0] }} transition={{ repeat: Infinity, duration: 12, ease: "linear", delay: 3 }} />
+            <motion.circle cx="100" cy="100" r="50" animate={{ r: [50, 130], opacity: [0.6, 0] }} transition={{ repeat: Infinity, duration: 12, ease: "linear", delay: 6 }} />
+            <motion.circle cx="100" cy="100" r="70" animate={{ r: [70, 150], opacity: [0.5, 0] }} transition={{ repeat: Infinity, duration: 12, ease: "linear", delay: 9 }} />
+          </svg>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-16">
             <h2 className="font-display text-3xl md:text-4xl font-normal text-white mb-4">Comprehensive <span className="italic font-light text-primary">Features</span></h2>
           </div>
@@ -251,8 +291,22 @@ export default function Home() {
       </section>
 
       {/* Use Cases */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative py-24 overflow-hidden">
+        {/* Large slow rotating grid background layout */}
+        <motion.div
+          className="absolute left-[-15%] bottom-[-15%] w-[550px] h-[550px] opacity-[0.12] text-primary pointer-events-none select-none z-0"
+          animate={{ rotate: -360 }}
+          transition={{ repeat: Infinity, duration: 90, ease: "linear" }}
+        >
+          <svg viewBox="0 0 200 200" fill="none" stroke="currentColor" strokeWidth="0.4">
+            <rect x="20" y="20" width="160" height="160" strokeDasharray="4,4" />
+            <line x1="20" y1="20" x2="180" y2="180" />
+            <line x1="20" y1="180" x2="180" y2="20" />
+            <circle cx="100" cy="100" r="80" />
+            <circle cx="100" cy="100" r="40" strokeDasharray="2,2" />
+          </svg>
+        </motion.div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="text-center mb-16">
             <h2 className="font-display text-3xl md:text-4xl font-normal text-white mb-4">Who Is <span className="italic font-light text-primary">This For?</span></h2>
           </div>
