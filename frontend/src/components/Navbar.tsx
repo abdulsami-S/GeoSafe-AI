@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Map, Menu, X } from "lucide-react";
+import { Map, Menu, X, Home, Compass, Info } from "lucide-react";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -11,9 +11,9 @@ export default function Navbar() {
   const pathname = usePathname();
 
   const links = [
-    { href: "/", label: "Home" },
-    { href: "/how-it-works", label: "How It Works" },
-    { href: "/about", label: "About" },
+    { href: "/", label: "Home", icon: Home },
+    { href: "/how-it-works", label: "How It Works", icon: Compass },
+    { href: "/about", label: "About", icon: Info },
   ];
 
   return (
@@ -37,25 +37,31 @@ export default function Navbar() {
 
           {/* Desktop nav */}
           <div className="hidden md:block">
-            <div className="ml-10 flex items-center space-x-6">
+            <div className="ml-10 flex items-center space-x-4">
               {links.map((link) => {
                 const isActive = pathname === link.href;
+                const IconComponent = link.icon;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`relative px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
-                      isActive ? "text-white" : "text-gray-300 hover:text-white"
+                    className={`relative p-2.5 rounded-full transition-colors duration-200 group flex items-center justify-center ${
+                      isActive ? "text-primary" : "text-gray-400 hover:text-white"
                     }`}
                   >
                     {isActive && (
                       <motion.span
                         layoutId="activeNav"
-                        className="absolute inset-0 bg-white/5 rounded-md -z-10"
+                        className="absolute inset-0 bg-primary/10 border border-primary/20 rounded-full -z-10"
                         transition={{ type: "spring", stiffness: 380, damping: 30 }}
                       />
                     )}
-                    {link.label}
+                    <IconComponent className="w-5 h-5" />
+                    
+                    {/* Tooltip */}
+                    <span className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100 transition-all duration-200 bg-gray-900/95 backdrop-blur-md text-[10px] font-semibold uppercase tracking-wider text-gray-200 rounded-md px-2.5 py-1.5 border border-white/10 whitespace-nowrap shadow-[0_10px_20px_rgba(0,0,0,0.6)] z-[60] pointer-events-none">
+                      {link.label}
+                    </span>
                   </Link>
                 );
               })}
