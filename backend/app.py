@@ -376,18 +376,6 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     elif in_forest:     land_type = "Forest"
     else:               land_type = "Urban" if building_density > 500 else "Rural"
 
-    # ── Government / restricted land ─────────────────────────────────────
-    gov_land = False
-    gov_type = "Private"
-    if on_road:               gov_land, gov_type = True, "Road"
-    elif in_forest:           gov_land, gov_type = True, "Forest"
-    elif in_ocean or in_lake: gov_land, gov_type = True, "Water"
-    elif near_river:          gov_land, gov_type = True, "River Zone"
-    elif near_coast:          gov_land, gov_type = True, "Coastal Zone"
-
-    if on_road or gov_land:
-        risk = "High"
-
     # ── Surroundings breakdown (uses already-loaded local GDFs) ──────────
     res_pct, ind_pct, farm_pct, forest_pct, water_pct, other_pct = \
         analyze_surroundings(lat, lon, loc_res, loc_ind, loc_farm, loc_forest)
@@ -407,23 +395,82 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
         else f"{dominant_surround.lower()} development"
     )
 
+    # ── Government / restricted land ─────────────────────────────────────
+    gov_land = False
+    gov_type = "Private"
+    if on_road:               gov_land, gov_type = True, "Road"
+    elif in_forest:           gov_land, gov_type = True, "Forest"
+    elif in_ocean or in_lake: gov_land, gov_type = True, "Water"
+    elif near_river:          gov_land, gov_type = True, "River Zone"
+    elif near_coast:          gov_land, gov_type = True, "Coastal Zone"
+
+    # ── Risk overrides ───────────────────────────────────────────────────
+    if on_road or gov_land:
+        risk = "High"
+
+    # ── Land Compatibility Overrides ──────────────────────────────────────
+    compatibility_warning = ""
+    purpose_lower = purpose.lower().strip() if purpose else ""
+
+    if purpose_lower and purpose_lower != "general":
+        if purpose_lower == "industrial":
+            if land_type == "Residential":
+                risk = "High"
+                compatibility_warning = "CRITICAL WARNING: Compatibility conflict. Attempting to build an Industrial facility in a Residential zone poses extreme regulatory, health, and safety risks. "
+            elif land_type == "Farmland":
+                if risk != "High":
+                    risk = "Medium"
+                compatibility_warning = "WARNING: Agricultural compatibility alert. Converting active Farmland to Industrial use typically requires complex environmental permits and rezoning clearance. "
+            elif res_pct > 15.0 or dominant_surround == "Residential":
+                if risk != "High":
+                    risk = "Medium"
+                compatibility_warning = "WARNING: Proximity risk. Establishing industrial activity near a heavily Residential area (approx. {:.1f}% residential) will likely result in zoning, air quality, or noise violations. ".format(res_pct)
+        
+        elif purpose_lower == "residential":
+            if land_type == "Industrial":
+                risk = "High"
+                compatibility_warning = "CRITICAL WARNING: Health hazard. Locating Residential development on Industrial land exposes residents to chemical, noise, and environmental hazards. "
+            elif land_type == "Forest":
+                risk = "High"
+                compatibility_warning = "CRITICAL WARNING: Protected land. Building residential housing in a Forest conservation zone is heavily restricted and illegal. "
+            elif ind_pct > 10.0 or dominant_surround == "Industrial":
+                if risk != "High":
+                    risk = "Medium"
+                compatibility_warning = "WARNING: Environmental risk. Surrounding area is active Industrial ({:.1f}%), which presents air and noise pollution concerns for residential housing. ".format(ind_pct)
+        
+        elif purpose_lower == "farming":
+            if land_type == "Industrial":
+                risk = "High"
+                compatibility_warning = "CRITICAL WARNING: Contamination risk. Agricultural activities on Industrial land are prohibited due to high risk of heavy metal and soil contamination. "
+            elif land_type == "Forest":
+                if risk != "High":
+                    risk = "Medium"
+                compatibility_warning = "WARNING: Conservation zone. Land is classified as Forest; agricultural clearing may violate forest preservation regulations. "
+            elif ind_pct > 10.0:
+                if risk != "High":
+                    risk = "Medium"
+                compatibility_warning = "WARNING: Runoff hazard. Nearby industrial facilities ({:.1f}%) pose a chemical runoff and soil safety hazard for agricultural crops. ".format(ind_pct)
+
     explanation = (
         f"{land_type} land. Nearby → Residential:{res_pct}% "
         f"Industrial:{ind_pct}% Farming:{farm_pct}% "
         f"Forest:{forest_pct}% Water:{water_pct}% Other:{other_pct}%. "
     )
 
-    if purpose.lower() == "general" or not purpose:
+    if purpose_lower == "general" or not purpose_lower:
         explanation += f"Based on surroundings, this land is best suited for {dev_type}."
     else:
         target_pct = surroundings_map.get(purpose.title(), 0)
-        if target_pct > 5 or land_type.lower() == purpose.lower():
+        if target_pct > 5 or land_type.lower() == purpose_lower:
             explanation += f"Suitable for {purpose} usage. Surrounding area implies compatibility."
         else:
             explanation += (
                 f"May not be ideal for {purpose}. "
                 f"The dominant surrounding sector is {dominant_surround}."
             )
+
+    if compatibility_warning:
+        explanation = compatibility_warning + explanation
 
     if on_road:
         explanation = "CRITICAL WARNING: Location is on public road infrastructure! " + explanation

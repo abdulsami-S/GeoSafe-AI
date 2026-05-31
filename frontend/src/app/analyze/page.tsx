@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useDebounce } from "@/hooks/useDebounce";
+import type { MapAnalysisResult } from "@/components/Map";
 
 // ── PERF 3 (Frontend): Lazy-load the map ────────────────────────────────────
 // MapWrapper already disables SSR.  Here we go one step further: the map
@@ -96,6 +97,9 @@ export default function AnalyzePage() {
 
   // Timers for the loading step advancement
   const stepTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Ref for scrolling to map after results
+  const mapSectionRef = useRef<HTMLDivElement>(null);
 
   // ── Progressive reveal: unlock phases with timed delays ──────────────────
   const startReveal = useCallback(() => {
@@ -194,7 +198,13 @@ export default function AnalyzePage() {
 
       const data: AnalysisResult = await response.json();
       setResult(data);
-      startReveal(); // kick off the staged reveal
+      setShowMap(true);  // Auto-show map on result
+      startReveal();
+
+      // Scroll map into view after a brief delay for render
+      setTimeout(() => {
+        mapSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 400);
     } catch (err: unknown) {
       // Ignore AbortError — it means we deliberately cancelled the request
       if (err instanceof Error && err.name === "AbortError") return;
@@ -342,13 +352,11 @@ export default function AnalyzePage() {
             </form>
           </div>
 
-          {/* ── PERF 3: Deferred map — only mounts when the user asks for it ── */}
-          {/* WHY: Leaflet adds ~200 kB of JS to the bundle. By only mounting the  */}
-          {/* map when the user explicitly requests it, we keep the initial page   */}
-          {/* load fast and reduce Time-to-Interactive significantly.              */}
+          {/* ── Map — always visible, satellite imagery with result overlay ── */}
           <div
+            ref={mapSectionRef}
             className="glass-panel overflow-hidden relative"
-            style={{ minHeight: showMap ? "400px" : "auto" }}
+            style={{ minHeight: showMap ? "450px" : "auto" }}
           >
             {!showMap ? (
               <button
@@ -360,12 +368,26 @@ export default function AnalyzePage() {
                 <span className="text-sm font-medium">Show Interactive Map</span>
               </button>
             ) : (
-              <div className="h-[400px] relative overflow-hidden rounded-xl animate-fade-in-up">
+              <div className="h-[450px] relative overflow-hidden rounded-xl animate-fade-in-up">
                 <MapWrapper
                   lat={mapLat}
                   lon={mapLon}
                   onLocationSelect={handleMapSelect}
                   riskLevel={result?.risk}
+                  analysisResult={
+                    result
+                      ? {
+                          risk: result.risk,
+                          land_type: result.land_type,
+                          terrain: result.terrain,
+                          elevation: result.elevation,
+                          gov_land: result.gov_land,
+                          gov_type: result.gov_type,
+                          on_road: result.on_road,
+                          building_density: result.building_density,
+                        }
+                      : undefined
+                  }
                 />
                 
                 {/* Radar scanning sweep overlay while loading */}
@@ -413,6 +435,16 @@ export default function AnalyzePage() {
                 <div className="absolute top-4 left-4 z-[399] bg-black/60 backdrop-blur text-white text-xs px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
                   <InfoIcon className="w-3 h-3 text-primary" /> Click map to select location
                 </div>
+
+                {/* Scan radius indicator badge */}
+                {result && (
+                  <div className="absolute bottom-4 right-4 z-[399] bg-black/70 backdrop-blur text-white text-[10px] px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2 font-mono">
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${
+                      result.risk === 'High' ? 'bg-red-500' : result.risk === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
+                    }`} />
+                    10 km scan radius
+                  </div>
+                )}
               </div>
             )}
           </div>
