@@ -88,9 +88,10 @@ function Step({ number, icon: Icon, title, description, tech }: StepProps) {
 
       {/* Card content — always takes remaining width */}
       <motion.div 
-        className="flex-1 glass-panel p-6 transition-all duration-300 hover:border-primary/20"
+        className="flex-1 glass-panel p-6 transition-colors duration-300"
         whileHover={{
           scale: 1.015,
+          borderColor: "rgba(59,130,246,0.2)",
           backgroundColor: "rgba(255, 255, 255, 0.04)",
           boxShadow: "0 10px 25px -10px rgba(59,130,246,0.15)"
         }}

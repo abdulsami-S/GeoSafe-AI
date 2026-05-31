@@ -154,7 +154,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.6, delay: i * 0.1, type: "spring", stiffness: 80 }}
+                transition={{ type: "spring", stiffness: 100, damping: 15, delay: i * 0.08 }}
               >
                 <div className="font-display text-5xl font-light text-white mb-2">{stat.value}</div>
                 <div className="text-[10px] text-gray-400 font-semibold uppercase tracking-widest">
@@ -185,11 +185,11 @@ export default function Home() {
             ].map((step, i) => (
               <motion.div
                 key={i}
-                className="relative z-10 glass-panel p-8 text-center transition-all duration-300"
+                className="relative z-10 glass-panel p-8 text-center transition-colors duration-300"
                 initial={{ opacity: 0, y: 25 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: i * 0.15 }}
+                transition={{ type: "spring", stiffness: 100, damping: 15, delay: i * 0.1 }}
                 whileHover={{ 
                   y: -8, 
                   borderColor: "rgba(59,130,246,0.3)",
@@ -266,12 +266,12 @@ export default function Home() {
             ].map((useCase, i) => (
               <motion.div
                 key={i}
-                className="glass-panel p-6 border-t-4 transition-all duration-300"
+                className="glass-panel p-6 border-t-4 transition-colors duration-300"
                 style={{ borderTopColor: "rgb(var(--primary))" }}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.6, delay: i * 0.1, type: "spring", stiffness: 80 }}
+                transition={{ type: "spring", stiffness: 100, damping: 15, delay: i * 0.08 }}
                 whileHover={{ 
                   y: -10, 
                   backgroundColor: "rgba(255,255,255,0.04)",

@@ -131,14 +131,14 @@ export default function AboutPage() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.1 }}
-              transition={{ delay: i * 0.08, duration: 0.4, type: "spring", stiffness: 100 }}
+              transition={{ type: "spring", stiffness: 100, damping: 15, delay: i * 0.06 }}
               whileHover={{ 
                 scale: 1.03,
                 borderColor: "rgba(59,130,246,0.3)",
                 boxShadow: "0 10px 25px -10px rgba(59,130,246,0.25)",
                 backgroundColor: "rgba(255, 255, 255, 0.04)"
               }}
-              className="glass-panel p-6 text-center transition-all duration-300"
+              className="glass-panel p-6 text-center transition-colors duration-300"
             >
               <motion.div 
                 className="w-20 h-20 rounded-full mx-auto mb-4 border-2 border-primary/30 flex items-center justify-center cursor-pointer" 
