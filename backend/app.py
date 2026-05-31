@@ -69,53 +69,30 @@ ocean.geometry = ocean.geometry.simplify(0.01)
 lakes.geometry = lakes.geometry.simplify(0.01)
 
 # =============================================================================
-# REGION BOUNDING BOX — limits in-memory data to the target area
+# OSM SHAPEFILE PATHS — all OSM layers are read per-request within SCAN_RADIUS
 # =============================================================================
-# Loading entire India-wide shapefiles (~7M buildings, ~3M roads) exhausts RAM.
-# We clip to a generous bbox around Telangana + surrounding states.
-# Expand REGION_BBOX if queries from other regions are needed.
-# Format: (min_lon, min_lat, max_lon, max_lat)
-# =============================================================================
-REGION_BBOX = (72.0, 8.0, 88.0, 28.0)   # covers all of peninsular + central India
-
-# =============================================================================
-# LANDUSE — loaded once at startup (region filtered)
-# =============================================================================
-print("[startup] Loading landuse layer…")
-landuse     = gpd.read_file(
-    os.path.join(DATA_DIR, "gis_osm_landuse_a_free_1.shp"),
-    bbox=REGION_BBOX
-).to_crs(epsg=4326)
-residential = landuse[landuse["fclass"] == "residential"]
-industrial  = landuse[landuse["fclass"] == "industrial"]
-farmland    = landuse[landuse["fclass"] == "farmland"]
-forest      = landuse[landuse["fclass"] == "forest"]
-
-# =============================================================================
-# BUILDINGS & ROADS — paths only (loaded per-request with tight bbox)
-# =============================================================================
-# Loading ~7M buildings + ~3M roads for all of India exhausts system RAM.
-# Instead we use pyogrio's spatial-index-aware bbox read on every request:
-# GDAL reads only the shapefile pages that intersect the small query bbox,
-# typically <1 ms of I/O for a 1 km² area.  A tiny result cache avoids
-# repeated reads for the exact same coordinate (e.g. repeated user clicks).
-# =============================================================================
+LANDUSE_SHP   = os.path.join(DATA_DIR, "gis_osm_landuse_a_free_1.shp")
 BUILDINGS_SHP = os.path.join(DATA_DIR, "gis_osm_buildings_a_free_1.shp")
 ROADS_SHP     = os.path.join(DATA_DIR, "gis_osm_roads_free_1.shp")
-print("[startup] Buildings & roads will be read on-demand (per-request bbox).")
 
 # =============================================================================
-# PERF 3 (VERIFY) — R-TREE INDEXES FOR PRELOADED SPATIAL LAYERS
+# SCAN RADIUS — single knob that controls how far around the query point
+# every OSM layer is read.  Increase for wider context; decrease for speed.
+# 1 degree ≈ 111 km at the equator.
 # =============================================================================
-residential_sindex = residential.sindex
-industrial_sindex  = industrial.sindex
-farmland_sindex    = farmland.sindex
-forest_sindex      = forest.sindex
-rivers_sindex      = rivers.sindex
-lakes_sindex       = lakes.sindex
-ocean_sindex       = ocean.sindex
-coast_sindex       = coast.sindex
-print("[startup] All R-tree indexes ready.")
+SCAN_RADIUS_KM  = 10                      # kilometres to scan around the point
+SCAN_RADIUS_DEG = SCAN_RADIUS_KM / 111.0  # converted to decimal degrees
+
+print(f"[startup] All OSM layers will be scanned within {SCAN_RADIUS_KM} km of each query.")
+
+# =============================================================================
+# NATURAL EARTH — preloaded (global, tiny: ocean=2 features, lakes=1300, etc.)
+# =============================================================================
+rivers_sindex = rivers.sindex
+lakes_sindex  = lakes.sindex
+ocean_sindex  = ocean.sindex
+coast_sindex  = coast.sindex
+print("[startup] Natural-earth R-tree indexes ready. Server is UP.")
 
 # =============================================================================
 # HELPERS — each uses an R-tree pre-filter before exact geometry tests
@@ -155,54 +132,83 @@ def fast_distance(gdf, sindex, point):
 
 
 # =============================================================================
-# BUILDINGS — per-request bbox disk read
-# =============================================================================
-def get_buildings(lat: float, lon: float) -> int:
-    """
-    Count buildings within ~300 m by reading only the local bbox from disk.
-    pyogrio uses the shapefile's .shx spatial index so only matching pages
-    are read — typically < 5 ms for a 600 m × 600 m window.
-    """
-    try:
-        buffer = 0.003  # ≈ 300 m in decimal degrees
-        bbox   = (lon - buffer, lat - buffer, lon + buffer, lat + buffer)
-        gdf    = gpd.read_file(BUILDINGS_SHP, bbox=bbox)
-        return len(gdf)
-    except Exception:
-        return 0
-
-
-# =============================================================================
-# ROADS — per-request bbox disk read
+# LOCAL OSM LOADER — single function that reads ALL OSM layers for a point
 # =============================================================================
 _ROAD_CLASSES = {"primary", "secondary", "residential", "tertiary"}
 
-def get_roads_info(lat: float, lon: float):
+def load_local_osm(lat: float, lon: float):
     """
-    Find roads within ~500 m by reading only the local bbox from disk.
+    Read landuse, buildings, and roads from disk using a tight bbox of
+    SCAN_RADIUS_DEG around the query point.  pyogrio uses the .shx spatial
+    index so only the relevant shapefile pages are touched — typically
+    10–50 ms total for all three layers on a local SSD/HDD.
+
+    Returns: (loc_res, loc_ind, loc_farm, loc_forest,
+              building_count, on_road, near_road, road_count)
     """
+    bbox = (
+        lon - SCAN_RADIUS_DEG, lat - SCAN_RADIUS_DEG,
+        lon + SCAN_RADIUS_DEG, lat + SCAN_RADIUS_DEG,
+    )
+    point_geom = Point(lon, lat)
+
+    # ── Landuse ──────────────────────────────────────────────────────────
     try:
-        buffer = 0.005  # ≈ 500 m in decimal degrees
-        bbox   = (lon - buffer, lat - buffer, lon + buffer, lat + buffer)
-        gdf    = gpd.read_file(ROADS_SHP, bbox=bbox)
-
-        if gdf.empty:
-            return False, False, 0
-
-        gdf = gdf[gdf["fclass"].isin(_ROAD_CLASSES)]
-        if gdf.empty:
-            return False, False, 0
-
-        gdf          = gdf.to_crs(epsg=3857)
-        point_proj   = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326") \
-                           .to_crs(epsg=3857).iloc[0]
-        min_dist     = gdf.distance(point_proj).min()
-        on_road      = min_dist < 10
-        near_road    = min_dist < 100
-
-        return bool(on_road), bool(near_road), len(gdf)
+        lu       = gpd.read_file(LANDUSE_SHP, bbox=bbox).to_crs(epsg=4326)
+        loc_res  = lu[lu["fclass"] == "residential"]
+        loc_ind  = lu[lu["fclass"] == "industrial"]
+        loc_farm = lu[lu["fclass"] == "farmland"]
+        loc_for  = lu[lu["fclass"] == "forest"]
     except Exception:
-        return False, False, 0
+        empty = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+        loc_res = loc_ind = loc_farm = loc_for = empty
+
+    # ── Buildings ────────────────────────────────────────────────────────
+    # Tighter box: only 300 m radius for density count
+    try:
+        b_buf    = 0.003   # ≈ 300 m
+        b_bbox   = (lon-b_buf, lat-b_buf, lon+b_buf, lat+b_buf)
+        bld      = gpd.read_file(BUILDINGS_SHP, bbox=b_bbox)
+        building_count = len(bld)
+    except Exception:
+        building_count = 0
+
+    # ── Roads ────────────────────────────────────────────────────────────
+    # 500 m radius for road proximity
+    try:
+        r_buf  = 0.005   # ≈ 500 m
+        r_bbox = (lon-r_buf, lat-r_buf, lon+r_buf, lat+r_buf)
+        rds    = gpd.read_file(ROADS_SHP, bbox=r_bbox)
+        if rds.empty:
+            on_road = near_road = False
+            road_count = 0
+        else:
+            rds = rds[rds["fclass"].isin(_ROAD_CLASSES)]
+            if rds.empty:
+                on_road = near_road = False
+                road_count = 0
+            else:
+                rds_proj   = rds.to_crs(epsg=3857)
+                pt_proj    = gpd.GeoSeries([point_geom], crs="EPSG:4326").to_crs(epsg=3857).iloc[0]
+                min_dist   = rds_proj.distance(pt_proj).min()
+                on_road    = bool(min_dist < 10)
+                near_road  = bool(min_dist < 100)
+                road_count = len(rds)
+    except Exception:
+        on_road = near_road = False
+        road_count = 0
+
+    return loc_res, loc_ind, loc_farm, loc_for, building_count, on_road, near_road, road_count
+
+
+# =============================================================================
+# LOCAL CONTAINMENT CHECK — works on a small local GeoDataFrame
+# =============================================================================
+def local_in_area(gdf: gpd.GeoDataFrame, point) -> bool:
+    """Point-in-polygon check on a small local GDF (no sindex needed)."""
+    if gdf is None or gdf.empty:
+        return False
+    return bool(gdf.contains(point).any())
 
 
 # =============================================================================
@@ -248,9 +254,13 @@ def terrain_type(e):
 
 
 # =============================================================================
-# SURROUNDINGS — fully R-tree indexed via calc()
+# SURROUNDINGS — uses the local GDFs already loaded by load_local_osm()
 # =============================================================================
-def analyze_surroundings(lat, lon, radius_km=5):
+def analyze_surroundings(lat, lon, loc_res, loc_ind, loc_farm, loc_forest, radius_km=5):
+    """
+    Compute land-use percentage breakdown within radius_km of the point.
+    Accepts locally-loaded GDFs so no extra disk I/O is needed.
+    """
     try:
         pt_4326    = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326")
         pt_3857    = pt_4326.to_crs(epsg=3857).iloc[0]
@@ -258,23 +268,27 @@ def analyze_surroundings(lat, lon, radius_km=5):
         buf_4326   = gpd.GeoSeries([buf_3857], crs="EPSG:3857").to_crs(epsg=4326).iloc[0]
         total_area = buf_3857.area
 
-        def calc(gdf, sindex):
-            idx = list(sindex.intersection(buf_4326.bounds))  # R-tree filter
-            if not idx:
+        def calc(gdf):
+            """Intersect gdf with the buffer circle and compute area %."""
+            if gdf is None or gdf.empty:
                 return 0
-            candidates = gdf.iloc[idx]
-            inter = candidates.intersection(buf_4326)
+            inter = gdf.intersection(buf_4326)
             inter = inter[~inter.is_empty]
-            if len(inter) == 0:
+            if inter.empty:
                 return 0
             inter_3857 = gpd.GeoSeries(inter, crs="EPSG:4326").to_crs(epsg=3857)
             return round((inter_3857.area.sum() / total_area) * 100, 1)
 
-        res_pct    = calc(residential, residential_sindex)
-        ind_pct    = calc(industrial,  industrial_sindex)
-        farm_pct   = calc(farmland,    farmland_sindex)
-        forest_pct = calc(forest,      forest_sindex)
-        water_pct  = round(calc(lakes, lakes_sindex) + calc(ocean, ocean_sindex), 1)
+        res_pct    = calc(loc_res)
+        ind_pct    = calc(loc_ind)
+        farm_pct   = calc(loc_farm)
+        forest_pct = calc(loc_forest)
+        # Water: use preloaded natural-earth lakes + ocean (already global & small)
+        water_pct  = round(
+            calc(lakes[lakes.intersects(buf_4326)]) +
+            calc(ocean[ocean.intersects(buf_4326)]),
+            1
+        )
 
         used_pct  = round(res_pct + ind_pct + farm_pct + forest_pct + water_pct, 1)
         other_pct = round(max(0, 100.0 - used_pct), 1)
@@ -293,11 +307,11 @@ def analyze_surroundings(lat, lon, radius_km=5):
 async def health():
     """Liveness probe — also reports runtime cache statistics."""
     return {
-        "status": "ok",
-        "cached_results":    len(_result_cache),
-        "landuse_loaded":    len(landuse),
-        "buildings_on_demand": True,
-        "roads_on_demand":     True,
+        "status":           "ok",
+        "cached_results":   len(_result_cache),
+        "scan_radius_km":   SCAN_RADIUS_KM,
+        "osm_mode":         "per-request local bbox",
+        "natural_earth":    "preloaded",
     }
 
 @app.delete("/cache/clear")
@@ -315,30 +329,38 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     All GIS + ML work lives here — purely synchronous.
     Called via run_in_executor() so it runs in a thread-pool worker and does
     NOT block uvicorn's async event loop.
+
+    Strategy: read ALL OSM data (landuse, buildings, roads) from a local
+    SCAN_RADIUS_KM bbox around the query point.  Only Natural Earth layers
+    (ocean, lakes, rivers, coast) are preloaded — they are globally tiny.
     """
     point = Point(lon, lat)
 
-    # Containment checks — all R-tree indexed via check_area()
-    in_residential = check_area(residential, residential_sindex, point)
-    in_industrial  = check_area(industrial,  industrial_sindex,  point)
-    in_farmland    = check_area(farmland,     farmland_sindex,    point)
-    in_forest      = check_area(forest,       forest_sindex,      point)
-    in_ocean       = check_area(ocean,        ocean_sindex,       point)
-    in_lake        = check_area(lakes,        lakes_sindex,       point)
+    # ── Single disk pass: load all OSM data within SCAN_RADIUS ───────────
+    loc_res, loc_ind, loc_farm, loc_forest, \
+    building_density, on_road, near_road, road_count = load_local_osm(lat, lon)
 
-    # Distance queries — all R-tree indexed via fast_distance()
+    # ── Containment checks (local landuse) ───────────────────────────────
+    in_residential = local_in_area(loc_res,    point)
+    in_industrial  = local_in_area(loc_ind,    point)
+    in_farmland    = local_in_area(loc_farm,   point)
+    in_forest      = local_in_area(loc_forest, point)
+
+    # ── Containment checks (preloaded natural earth) ──────────────────────
+    in_ocean = check_area(ocean, ocean_sindex, point)
+    in_lake  = check_area(lakes, lakes_sindex, point)
+
+    # ── Distance to natural features (preloaded, R-tree indexed) ─────────
     dist_river  = fast_distance(rivers, rivers_sindex, point)
     dist_lake   = fast_distance(lakes,  lakes_sindex,  point)
     dist_ocean  = fast_distance(ocean,  ocean_sindex,  point)
-    dist_forest = fast_distance(forest, forest_sindex, point)
     dist_coast  = fast_distance(coast,  coast_sindex,  point)
+    # Forest distance from local data
+    dist_forest = fast_distance(loc_forest, loc_forest.sindex, point) \
+                  if not loc_forest.empty else 999.0
 
     near_river = dist_river < 1.0
     near_coast = dist_coast < 1.0
-
-    # In-memory building/road lookups — PERF 3 (no disk I/O)
-    building_density               = get_buildings(lat, lon)
-    on_road, near_road, road_count = get_roads_info(lat, lon)
 
     elevation   = get_elevation(lat, lon)
     terrain     = terrain_type(elevation)
@@ -347,14 +369,14 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     features = [[dist_river, dist_lake, dist_ocean, dist_forest, elevation, terrain_val]]
     risk     = ["Low", "Medium", "High"][int(model.predict(features)[0])]
 
-    # Land type classification
+    # ── Land type classification ──────────────────────────────────────────
     if in_residential:  land_type = "Residential"
     elif in_industrial: land_type = "Industrial"
     elif in_farmland:   land_type = "Farmland"
     elif in_forest:     land_type = "Forest"
     else:               land_type = "Urban" if building_density > 500 else "Rural"
 
-    # Government / restricted land
+    # ── Government / restricted land ─────────────────────────────────────
     gov_land = False
     gov_type = "Private"
     if on_road:               gov_land, gov_type = True, "Road"
@@ -366,9 +388,9 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     if on_road or gov_land:
         risk = "High"
 
-    # Surroundings breakdown
+    # ── Surroundings breakdown (uses already-loaded local GDFs) ──────────
     res_pct, ind_pct, farm_pct, forest_pct, water_pct, other_pct = \
-        analyze_surroundings(lat, lon)
+        analyze_surroundings(lat, lon, loc_res, loc_ind, loc_farm, loc_forest)
 
     surroundings_map  = {
         "Residential": res_pct, "Industrial": ind_pct, "Farming": farm_pct,
