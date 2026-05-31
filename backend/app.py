@@ -460,9 +460,31 @@ def _run_analysis(lat: float, lon: float, purpose: str) -> dict:
     if purpose_lower == "general" or not purpose_lower:
         explanation += f"Based on surroundings, this land is best suited for {dev_type}."
     else:
-        target_pct = surroundings_map.get(purpose.title(), 0)
-        if target_pct > 5 or land_type.lower() == purpose_lower:
-            explanation += f"Suitable for {purpose} usage. Surrounding area implies compatibility."
+        is_compatible = False
+        reason = "Surrounding area implies compatibility."
+        
+        if land_type.lower() == purpose_lower:
+            is_compatible = True
+            reason = f"{land_type} land classification implies direct compatibility."
+        elif purpose_lower == "residential" and land_type.lower() in ["urban", "rural"]:
+            is_compatible = True
+            reason = f"{land_type} land classification is highly compatible with residential housing."
+        elif purpose_lower == "farming" and land_type.lower() in ["rural", "farmland"]:
+            is_compatible = True
+            reason = f"{land_type} land classification is highly compatible with agriculture."
+        elif purpose_lower == "industrial" and land_type.lower() in ["rural"]:
+            if res_pct <= 15.0:
+                is_compatible = True
+                reason = "Rural land classification can support industrial development in low-density surroundings."
+        
+        if not is_compatible:
+            target_pct = surroundings_map.get(purpose.title(), 0)
+            if target_pct > 5.0:
+                is_compatible = True
+                reason = f"Surrounding area has existing {purpose.lower()} sectors ({target_pct}%) implying compatibility."
+
+        if is_compatible:
+            explanation += f"Suitable for {purpose} usage. {reason}"
         else:
             explanation += (
                 f"May not be ideal for {purpose}. "
