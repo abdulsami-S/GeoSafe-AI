@@ -69,52 +69,43 @@ ocean.geometry = ocean.geometry.simplify(0.01)
 lakes.geometry = lakes.geometry.simplify(0.01)
 
 # =============================================================================
-# LANDUSE — loaded once at startup
+# REGION BOUNDING BOX — limits in-memory data to the target area
+# =============================================================================
+# Loading entire India-wide shapefiles (~7M buildings, ~3M roads) exhausts RAM.
+# We clip to a generous bbox around Telangana + surrounding states.
+# Expand REGION_BBOX if queries from other regions are needed.
+# Format: (min_lon, min_lat, max_lon, max_lat)
+# =============================================================================
+REGION_BBOX = (72.0, 8.0, 88.0, 28.0)   # covers all of peninsular + central India
+
+# =============================================================================
+# LANDUSE — loaded once at startup (region filtered)
 # =============================================================================
 print("[startup] Loading landuse layer…")
-landuse     = gpd.read_file(os.path.join(DATA_DIR, "gis_osm_landuse_a_free_1.shp")).to_crs(epsg=4326)
+landuse     = gpd.read_file(
+    os.path.join(DATA_DIR, "gis_osm_landuse_a_free_1.shp"),
+    bbox=REGION_BBOX
+).to_crs(epsg=4326)
 residential = landuse[landuse["fclass"] == "residential"]
 industrial  = landuse[landuse["fclass"] == "industrial"]
 farmland    = landuse[landuse["fclass"] == "farmland"]
 forest      = landuse[landuse["fclass"] == "forest"]
 
 # =============================================================================
-# PERF 3a — PRE-LOAD BUILDINGS AT STARTUP + R-TREE INDEX
+# BUILDINGS & ROADS — paths only (loaded per-request with tight bbox)
 # =============================================================================
-# PREVIOUSLY: get_buildings() called gpd.read_file(…, bbox=bbox) on EVERY
-# request — that is a full disk read for a bbox slice of the file, which still
-# involves opening the file, parsing the header, and reading matched pages.
-#
-# NOW: Load the entire buildings shapefile once, build an R-tree spatial index
-# on it, then at query time do an O(log n) index intersection to retrieve only
-# the candidate rows — zero disk I/O after startup.
+# Loading ~7M buildings + ~3M roads for all of India exhausts system RAM.
+# Instead we use pyogrio's spatial-index-aware bbox read on every request:
+# GDAL reads only the shapefile pages that intersect the small query bbox,
+# typically <1 ms of I/O for a 1 km² area.  A tiny result cache avoids
+# repeated reads for the exact same coordinate (e.g. repeated user clicks).
 # =============================================================================
-print("[startup] Loading buildings shapefile…")
-buildings_gdf    = gpd.read_file(os.path.join(DATA_DIR, "gis_osm_buildings_a_free_1.shp")).to_crs(epsg=4326)
-buildings_sindex = buildings_gdf.sindex   # R-tree built once here
-print(f"[startup] {len(buildings_gdf):,} buildings loaded.")
+BUILDINGS_SHP = os.path.join(DATA_DIR, "gis_osm_buildings_a_free_1.shp")
+ROADS_SHP     = os.path.join(DATA_DIR, "gis_osm_roads_free_1.shp")
+print("[startup] Buildings & roads will be read on-demand (per-request bbox).")
 
 # =============================================================================
-# PERF 3b — PRE-LOAD ROADS AT STARTUP + R-TREE INDEX
-# =============================================================================
-# Same rationale as buildings above. Additionally we pre-filter to only the
-# road classes we use, reducing both RAM usage and index size.
-# =============================================================================
-print("[startup] Loading roads shapefile…")
-_roads_raw = gpd.read_file(os.path.join(DATA_DIR, "gis_osm_roads_free_1.shp")).to_crs(epsg=4326)
-roads_gdf  = _roads_raw[_roads_raw["fclass"].isin([
-    "primary", "secondary", "residential", "tertiary"
-])].copy()
-del _roads_raw                            # release the unfiltered frame
-roads_sindex = roads_gdf.sindex          # R-tree built once here
-print(f"[startup] {len(roads_gdf):,} road segments loaded.")
-
-# =============================================================================
-# PERF 3 (VERIFY) — R-TREE INDEXES FOR ALL SPATIAL LAYERS
-# =============================================================================
-# GeoDataFrame.sindex is a libspatialindex R-tree. Accessing it here at
-# startup forces the index to be built now (the first access is when the cost
-# is paid). All subsequent sindex.intersection() calls are O(log n).
+# PERF 3 (VERIFY) — R-TREE INDEXES FOR PRELOADED SPATIAL LAYERS
 # =============================================================================
 residential_sindex = residential.sindex
 industrial_sindex  = industrial.sindex
@@ -164,51 +155,52 @@ def fast_distance(gdf, sindex, point):
 
 
 # =============================================================================
-# BUILDINGS — in-memory R-tree lookup (no disk I/O after startup)
+# BUILDINGS — per-request bbox disk read
 # =============================================================================
 def get_buildings(lat: float, lon: float) -> int:
     """
-    Count buildings within ~300 m using the in-memory R-tree.
-
-    Before: gpd.read_file(…, bbox=bbox) on every request  → disk I/O, slow.
-    After : buildings_sindex.intersection(bbox)            → O(log n), fast.
+    Count buildings within ~300 m by reading only the local bbox from disk.
+    pyogrio uses the shapefile's .shx spatial index so only matching pages
+    are read — typically < 5 ms for a 600 m × 600 m window.
     """
     try:
-        buffer = 0.003  # ≈ 300 m in decimal degrees at mid-latitudes
+        buffer = 0.003  # ≈ 300 m in decimal degrees
         bbox   = (lon - buffer, lat - buffer, lon + buffer, lat + buffer)
-        idx    = list(buildings_sindex.intersection(bbox))
-        return len(idx)
+        gdf    = gpd.read_file(BUILDINGS_SHP, bbox=bbox)
+        return len(gdf)
     except Exception:
         return 0
 
 
 # =============================================================================
-# ROADS — in-memory R-tree lookup (no disk I/O after startup)
+# ROADS — per-request bbox disk read
 # =============================================================================
+_ROAD_CLASSES = {"primary", "secondary", "residential", "tertiary"}
+
 def get_roads_info(lat: float, lon: float):
     """
-    Find roads within ~500 m and measure distance to nearest.
-
-    Before: gpd.read_file(…, bbox=bbox) on every request  → disk I/O, slow.
-    After : roads_sindex.intersection(bbox)                → O(log n), fast.
+    Find roads within ~500 m by reading only the local bbox from disk.
     """
     try:
         buffer = 0.005  # ≈ 500 m in decimal degrees
         bbox   = (lon - buffer, lat - buffer, lon + buffer, lat + buffer)
-        idx    = list(roads_sindex.intersection(bbox))
+        gdf    = gpd.read_file(ROADS_SHP, bbox=bbox)
 
-        if not idx:
+        if gdf.empty:
             return False, False, 0
 
-        roads_nearby = roads_gdf.iloc[idx].to_crs(epsg=3857)
+        gdf = gdf[gdf["fclass"].isin(_ROAD_CLASSES)]
+        if gdf.empty:
+            return False, False, 0
+
+        gdf          = gdf.to_crs(epsg=3857)
         point_proj   = gpd.GeoSeries([Point(lon, lat)], crs="EPSG:4326") \
                            .to_crs(epsg=3857).iloc[0]
+        min_dist     = gdf.distance(point_proj).min()
+        on_road      = min_dist < 10
+        near_road    = min_dist < 100
 
-        min_dist  = roads_nearby.distance(point_proj).min()
-        on_road   = min_dist < 10
-        near_road = min_dist < 100
-
-        return bool(on_road), bool(near_road), len(idx)
+        return bool(on_road), bool(near_road), len(gdf)
     except Exception:
         return False, False, 0
 
@@ -302,9 +294,10 @@ async def health():
     """Liveness probe — also reports runtime cache statistics."""
     return {
         "status": "ok",
-        "cached_results":  len(_result_cache),
-        "buildings_loaded": len(buildings_gdf),
-        "roads_loaded":     len(roads_gdf),
+        "cached_results":    len(_result_cache),
+        "landuse_loaded":    len(landuse),
+        "buildings_on_demand": True,
+        "roads_on_demand":     True,
     }
 
 @app.delete("/cache/clear")
