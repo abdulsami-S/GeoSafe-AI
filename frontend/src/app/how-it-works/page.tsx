@@ -1,24 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Layers, Cpu, ShieldAlert, ChevronDown, ChevronUp, LucideIcon } from "lucide-react";
 
 export default function HowItWorksPage() {
   const containerRef = useRef<HTMLDivElement>(null);
-  
-  // Track scroll progress inside the timeline container
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start center", "end center"],
-  });
-
-  // Smooth the scroll progress line using spring physics
-  const scaleY = useSpring(scrollYProgress, {
-    stiffness: 100,
-    damping: 30,
-    restDelta: 0.001
-  });
 
   return (
     <div className="min-h-screen pt-24 pb-20 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
@@ -30,19 +17,6 @@ export default function HowItWorksPage() {
       </div>
 
       <div ref={containerRef} className="space-y-8 relative min-h-[600px]">
-        {/* Background track line */}
-        <div
-          className="absolute left-7 md:left-1/2 md:-translate-x-px top-0 bottom-0 w-0.5 bg-white/5 pointer-events-none"
-          aria-hidden="true"
-        />
-
-        {/* Animated active fill line */}
-        <motion.div
-          style={{ scaleY, originY: 0 }}
-          className="absolute left-7 md:left-1/2 md:-translate-x-px top-0 bottom-0 w-0.5 bg-gradient-to-b from-primary via-primary/70 to-primary/10 pointer-events-none z-[5]"
-          aria-hidden="true"
-        />
-
         <Step
           number={1}
           icon={MapPin}

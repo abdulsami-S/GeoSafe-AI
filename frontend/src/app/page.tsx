@@ -14,7 +14,7 @@ export default function Home() {
       {/* ── Hero Section ──────────────────────────────────────────────────────
           Uses pure CSS gradients + dot overlay. No external image dependency.
           Added slowly rotating compass rose grid + drifting coordinate stream. */}
-      <section className="relative pt-32 pb-28 overflow-hidden bg-[#0a0c14]">
+      <section className="relative min-h-[calc(100vh-64px)] flex items-center justify-center overflow-hidden bg-[#0a0c14] py-16">
         {/* Base gradient fill — always visible on any screen */}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg, #020c2e 0%, #0a0c14 50%, #011a0a 100%)' }} />
         {/* Radial "glow" centred behind the headline */}
@@ -177,8 +177,6 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 relative">
-            {/* Connecting line — positioned carefully so it doesn't overlay cards */}
-            <div className="hidden md:block absolute top-[56px] left-[calc(16%+32px)] right-[calc(16%+32px)] h-0.5 bg-gradient-to-r from-primary/0 via-primary/50 to-primary/0 z-0 pointer-events-none" />
 
             {[
               { icon: Map,          title: "1. Select Location", desc: "Drop a pin on the map or enter coordinates." },
