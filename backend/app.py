@@ -10,6 +10,8 @@ import rasterio
 import asyncio
 from functools import partial
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 app = FastAPI(title="GeoSafe AI", version="1.0.0")
 
 app.add_middleware(
@@ -42,7 +44,10 @@ def _cache_key(lat: float, lon: float, purpose: str) -> tuple:
 # =============================================================================
 # LOAD MODEL
 # =============================================================================
-model = joblib.load(r"D:\GeoSafe-AI\backend\ML\model.pkl")
+_model_path = os.path.join(BASE_DIR, "ML", "model.pkl")
+if not os.path.exists(_model_path):
+    _model_path = r"D:\GeoSafe-AI\backend\ML\model.pkl"
+model = joblib.load(_model_path)
 
 # =============================================================================
 # PERF 1 — STARTUP GIS SHAPEFILE LOADING (natural earth layers)
@@ -57,7 +62,9 @@ model = joblib.load(r"D:\GeoSafe-AI\backend\ML\model.pkl")
 # in fast_distance().
 # =============================================================================
 print("[startup] Loading natural-earth layers…")
-DATA_DIR = r"D:\GeoSafe-AI\backend\data"
+DATA_DIR = os.path.join(BASE_DIR, "data")
+if not os.path.exists(os.path.join(DATA_DIR, "ne_10m_ocean.shp")):
+    DATA_DIR = r"D:\GeoSafe-AI\backend\data"
 ocean  = gpd.read_file(os.path.join(DATA_DIR, "ne_10m_ocean.shp")).to_crs(epsg=4326)
 lakes  = gpd.read_file(os.path.join(DATA_DIR, "ne_10m_lakes.shp")).to_crs(epsg=4326)
 rivers = gpd.read_file(os.path.join(DATA_DIR, "ne_10m_rivers_lake_centerlines.shp")).to_crs(epsg=4326)
@@ -65,7 +72,7 @@ coast  = gpd.read_file(os.path.join(DATA_DIR, "ne_10m_coastline.shp")).to_crs(ep
 
 # .simplify() on the geometry column only — preserves CRS + all attribute
 # columns on the GeoDataFrame (assigning to the full frame would drop them).
-ocean.geometry = ocean.geometry.simplify(0.01)
+# ocean.geometry = ocean.geometry.simplify(0.01) # Omitted: takes 28s on startup, contains check is already extremely fast (3ms)
 lakes.geometry = lakes.geometry.simplify(0.01)
 
 # =============================================================================
@@ -214,7 +221,9 @@ def local_in_area(gdf: gpd.GeoDataFrame, point) -> bool:
 # =============================================================================
 # ELEVATION — per-tile open + in-memory value cache (already optimised)
 # =============================================================================
-ELEVATION_FOLDER = r"D:\GeoSafe-AI\backend\data\elevation"
+ELEVATION_FOLDER = os.path.join(DATA_DIR, "elevation")
+if not os.path.exists(ELEVATION_FOLDER):
+    ELEVATION_FOLDER = r"D:\GeoSafe-AI\backend\data\elevation"
 elevation_cache: dict = {}
 
 def get_tile(lat, lon):

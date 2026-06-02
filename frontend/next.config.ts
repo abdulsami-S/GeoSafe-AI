@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
   },
 
   // Fix: cross-origin hot-reload warning for LAN access
-  allowedDevOrigins: ["172.20.10.7"],
+  allowedDevOrigins: ["192.168.1.11", "172.20.10.7", "localhost"],
 };
 
 export default nextConfig;
